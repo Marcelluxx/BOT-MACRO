@@ -17,7 +17,10 @@ pyautogui.FAILSAFE = True
 
 # Configuration
 WINDOW_TITLE = "LDPlayer"  # Set to LDPlayer
-TEMPLATE_PATH = "assets/red_x.png"  # Image for popups
+POPUP_TEMPLATES = [
+    "assets/red_x.png",
+    "assets/grey_x.png"
+]
 
 # Global state
 stop_event = threading.Event()
@@ -35,17 +38,22 @@ def game_loop(window_manager: WindowManager, player: Player, vision: Vision):
             window_manager.bring_to_front()
             time.sleep(0.5)
 
-            # 2. Check for popups (e.g. a red X)
+            # 2. Check for popups (e.g. red X, grey X)
             rect = window_manager.get_window_rect()
             if rect:
-                # Utilizzo della vision per trovare e cliccare la X rossa
-                match_pos = vision.find_template(TEMPLATE_PATH, region=rect)
-                if match_pos:
-                    print(f"[Main] Trovato popup a {match_pos}. Clicco...")
-                    pyautogui.click(*match_pos)
-                    time.sleep(1)
-                    continue # Ricomincia il loop
-
+                found_popup = False
+                for template in POPUP_TEMPLATES:
+                    match_pos = vision.find_template(template, region=rect)
+                    if match_pos:
+                        print(f"[Main] Trovato popup ({template}) a {match_pos}. Clicco...")
+                        pyautogui.click(*match_pos)
+                        time.sleep(1)
+                        found_popup = True
+                        break # Esci dal ciclo dei template e ricomincia il loop principale
+                
+                if found_popup:
+                    continue # Ricomincia il loop principale per ricontrollare se ci sono altri popup
+            
             # 3. Play macro
             if player.load_macro("actions/macro.json"):
                 player.play(check_stop_callback=lambda: stop_event.is_set() or app_state != "PLAYING")
