@@ -16,8 +16,8 @@ from modules.vision import Vision
 pyautogui.FAILSAFE = True
 
 # Configuration
-WINDOW_TITLE = "BlueStacks App Player"  # Change this to match your emulator!
-TEMPLATE_PATH = "assets/template_red_x.png"  # Placeholder image for popups
+WINDOW_TITLE = "LDPlayer"  # Set to LDPlayer
+TEMPLATE_PATH = "assets/red_x.png"  # Image for popups
 
 # Global state
 stop_event = threading.Event()
@@ -38,17 +38,16 @@ def game_loop(window_manager: WindowManager, player: Player, vision: Vision):
             # 2. Check for popups (e.g. a red X)
             rect = window_manager.get_window_rect()
             if rect:
-                # Esempio di utilizzo della vision (commentato finche' non c'e' l'immagine)
-                # match_pos = vision.find_template(TEMPLATE_PATH, region=rect)
-                # if match_pos:
-                #     print(f"[Main] Trovato popup a {match_pos}. Clicco...")
-                #     pyautogui.click(*match_pos)
-                #     time.sleep(1)
-                #     continue # Ricomincia il loop
-                pass
+                # Utilizzo della vision per trovare e cliccare la X rossa
+                match_pos = vision.find_template(TEMPLATE_PATH, region=rect)
+                if match_pos:
+                    print(f"[Main] Trovato popup a {match_pos}. Clicco...")
+                    pyautogui.click(*match_pos)
+                    time.sleep(1)
+                    continue # Ricomincia il loop
 
             # 3. Play macro
-            if player.load_macro("macro.json"):
+            if player.load_macro("actions/macro.json"):
                 player.play(check_stop_callback=lambda: stop_event.is_set() or app_state != "PLAYING")
             else:
                 print("[Main] Failed to load macro. Switching to IDLE.")

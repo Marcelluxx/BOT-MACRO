@@ -53,13 +53,15 @@ class Vision:
 
         # Perform template matching
         res = cv2.matchTemplate(gray_img, template, cv2.TM_CCOEFF_NORMED)
-        loc = np.where(res >= threshold)
-        
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+        print(f"[Vision] '{template_path}' -> Max Similarity: {max_val:.2%}")
+
         # If match found
-        if len(loc[0]) > 0:
-            # Take the first match
-            match_y, match_x = loc[0][0], loc[1][0]
-            # Calculate center relative to the captured region
+        if max_val >= threshold:
+            match_x, match_y = max_loc
+            
+            # Calcola il centro
             center_x = match_x + template_w // 2
             center_y = match_y + template_h // 2
             

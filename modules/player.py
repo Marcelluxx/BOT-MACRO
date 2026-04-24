@@ -15,7 +15,7 @@ class Player:
         self.macro: List[Dict[str, Any]] = []
         self.is_playing = False
 
-    def load_macro(self, filename: str = "macro.json") -> bool:
+    def load_macro(self, filename: str = "actions/macro.json") -> bool:
         try:
             with open(filename, "r", encoding="utf-8") as f:
                 self.macro = json.load(f)

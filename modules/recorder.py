@@ -5,6 +5,7 @@ and saves the macro to a JSON file.
 """
 import time
 import json
+import os
 from pynput import mouse
 from typing import List, Dict, Any, Optional
 
@@ -61,11 +62,14 @@ class Recorder:
         self.listener.start()
         print("[Recorder] Started recording.")
 
-    def stop(self, filename: str = "macro.json"):
+    def stop(self, filename: str = "actions/macro.json"):
         self.is_recording = False
         if self.listener:
             self.listener.stop()
             self.listener = None
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.macro, f, indent=4)
