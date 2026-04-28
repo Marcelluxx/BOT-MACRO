@@ -5,3 +5,4 @@ opencv-python
 mss
 numpy
 keyboard
+PyQt6

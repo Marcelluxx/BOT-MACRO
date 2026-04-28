@@ -1,134 +1,150 @@
 """
 Main entry point for the automation bot.
-Manages global hotkeys, orchestrates the components, and runs the game loop.
+- Default: launches the visual GUI editor.
+- With --cli flag: runs the original CLI game loop.
 """
 import sys
-import threading
-import time
-import keyboard
-import pyautogui
-from modules.window_manager import WindowManager
-from modules.recorder import Recorder
-from modules.player import Player
-from modules.vision import Vision
+import os
 
-# PyAutoGUI fail-safe (moving mouse to a corner will abort)
-pyautogui.FAILSAFE = True
+# Ensure project root is in path
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-# Configuration
-WINDOW_TITLE = "LDPlayer"  # Set to LDPlayer
-POPUP_TEMPLATES = [
-    "assets/red_x.png",
-    "assets/grey_x.png"
-]
 
-# Global state
-stop_event = threading.Event()
-app_state = "IDLE" # IDLE, RECORDING, PLAYING
+def run_gui():
+    """Launches the PyQt6 visual macro editor."""
+    from PyQt6.QtWidgets import QApplication
+    from gui.main_window import MainWindow
+    from gui.styles import GLOBAL_STYLESHEET
 
-def game_loop(window_manager: WindowManager, player: Player, vision: Vision):
-    """
-    The main game loop executed when playing.
-    """
-    global app_state
-    
-    while not stop_event.is_set():
-        if app_state == "PLAYING":
-            # 1. Bring window to front
-            window_manager.bring_to_front()
-            time.sleep(0.5)
+    app = QApplication(sys.argv)
+    app.setStyleSheet(GLOBAL_STYLESHEET)
+    app.setStyle("Fusion")  # Consistent cross-platform look
 
-            # 2. Check for popups (e.g. red X, grey X)
-            rect = window_manager.get_window_rect()
-            if rect:
-                found_popup = False
-                for template in POPUP_TEMPLATES:
-                    match_pos = vision.find_template(template, region=rect)
-                    if match_pos:
-                        print(f"[Main] Trovato popup ({template}) a {match_pos}. Clicco...")
-                        pyautogui.click(*match_pos)
-                        time.sleep(1)
-                        found_popup = True
-                        break # Esci dal ciclo dei template e ricomincia il loop principale
-                
-                if found_popup:
-                    continue # Ricomincia il loop principale per ricontrollare se ci sono altri popup
-            
-            # 3. Play macro
-            if player.load_macro("actions/macro.json"):
-                player.play(check_stop_callback=lambda: stop_event.is_set() or app_state != "PLAYING")
+    window = MainWindow()
+    window.show()
+
+    sys.exit(app.exec())
+
+
+def run_cli():
+    """Runs the original CLI-based game loop (legacy mode)."""
+    import threading
+    import time
+    import keyboard
+    import pyautogui
+    from modules.window_manager import WindowManager
+    from modules.recorder import Recorder
+    from modules.player import Player
+    from modules.vision import Vision
+
+    # PyAutoGUI fail-safe (moving mouse to a corner will abort)
+    pyautogui.FAILSAFE = True
+
+    # Configuration
+    WINDOW_TITLE = "LDPlayer"
+
+    # Global state
+    stop_event = threading.Event()
+    app_state = {"value": "IDLE"}  # IDLE, RECORDING, PLAYING
+
+    def game_loop(window_manager, player, vision):
+        while not stop_event.is_set():
+            if app_state["value"] == "PLAYING":
+                window_manager.bring_to_front()
+                time.sleep(0.5)
+
+                rect = window_manager.get_window_rect()
+                if rect:
+                    # Re-scan loop: click one popup at a time, re-screenshot after each
+                    popup_cleared = False
+                    for _ in range(20):  # Safety limit
+                        matches = vision.find_all_templates(assets_dir="assets", region=rect)
+                        if not matches:
+                            break
+                        abs_x, abs_y, name = matches[0]
+                        print(f"[Main] Found popup ({name}) at ({abs_x}, {abs_y}). Clicking...")
+                        pyautogui.click(abs_x, abs_y)
+                        time.sleep(0.8)
+                        popup_cleared = True
+                    if popup_cleared:
+                        continue
+
+                # Play macro
+                if player.load_macro("actions/macro.json"):
+                    player.play(check_stop_callback=lambda: stop_event.is_set() or app_state["value"] != "PLAYING")
+                else:
+                    print("[Main] Failed to load macro. Switching to IDLE.")
+                    app_state["value"] = "IDLE"
             else:
-                print("[Main] Failed to load macro. Switching to IDLE.")
-                app_state = "IDLE"
-                
+                time.sleep(0.5)
+
+    def toggle_record(recorder):
+        if app_state["value"] == "PLAYING":
+            print("[Hotkey] Cannot record while playing.")
+            return
+        if app_state["value"] == "RECORDING":
+            recorder.stop()
+            app_state["value"] = "IDLE"
         else:
-            # When IDLE or RECORDING, just sleep to prevent high CPU usage
-            time.sleep(0.5)
+            recorder.start()
+            app_state["value"] = "RECORDING"
 
-def toggle_record(recorder: Recorder):
-    global app_state
-    if app_state == "PLAYING":
-        print("[Hotkey] Cannot record while playing. Stop playback first.")
-        return
-        
-    if app_state == "RECORDING":
-        recorder.stop()
-        app_state = "IDLE"
-    else:
-        recorder.start()
-        app_state = "RECORDING"
+    def toggle_play():
+        if app_state["value"] == "RECORDING":
+            print("[Hotkey] Cannot play while recording.")
+            return
+        if app_state["value"] == "PLAYING":
+            app_state["value"] = "IDLE"
+            print("[Hotkey] Stopped playback.")
+        else:
+            app_state["value"] = "PLAYING"
+            print("[Hotkey] Started playback.")
 
-def toggle_play():
-    global app_state
-    if app_state == "RECORDING":
-        print("[Hotkey] Cannot play while recording. Stop recording first.")
-        return
-        
-    if app_state == "PLAYING":
-        app_state = "IDLE"
-        print("[Hotkey] Stopped playback. Now IDLE.")
-    else:
-        app_state = "PLAYING"
-        print("[Hotkey] Started playback.")
+    def insert_flag(recorder):
+        if app_state["value"] == "RECORDING":
+            recorder.insert_flag()
 
-def emergency_stop():
-    print("\n[EMERGENCY STOP] Stopping all operations immediately!")
-    stop_event.set()
-    sys.exit(0)
+    def emergency_stop():
+        print("\n[EMERGENCY STOP] Stopping all operations!")
+        stop_event.set()
+        sys.exit(0)
 
-def main():
-    print("Initializing Desktop Automation Bot...")
-    
+    print("Initializing Desktop Automation Bot (CLI Mode)...")
+
     window_manager = WindowManager(WINDOW_TITLE)
     recorder = Recorder(window_manager)
     player = Player(window_manager)
     vision = Vision()
 
-    # Set up global hotkeys
+    keyboard.add_hotkey('F7', insert_flag, args=(recorder,))
     keyboard.add_hotkey('F8', toggle_record, args=(recorder,))
     keyboard.add_hotkey('F9', toggle_play)
     keyboard.add_hotkey('esc', emergency_stop)
-    
-    print("\n" + "="*40)
-    print("Bot is ready!")
+
+    print("\n" + "=" * 40)
+    print("Bot is ready! (CLI Mode)")
     print("Hotkeys:")
+    print("  [F7]  - Insert Vision Scan Flag (during recording)")
     print("  [F8]  - Toggle Record Macro")
     print("  [F9]  - Toggle Play Macro Loop")
     print("  [ESC] - Emergency Stop / Exit")
-    print("Note: PyAutoGUI Fail-Safe is active. Move mouse to any corner to abort.")
-    print("="*40 + "\n")
+    print("=" * 40 + "\n")
 
-    # Start the game loop thread
     game_thread = threading.Thread(target=game_loop, args=(window_manager, player, vision))
     game_thread.daemon = True
     game_thread.start()
 
-    # Keep main thread alive to listen to hotkeys
     try:
         while not stop_event.is_set():
             time.sleep(0.1)
     except KeyboardInterrupt:
         emergency_stop()
 
+
 if __name__ == "__main__":
-    main()
+    if "--cli" in sys.argv:
+        run_cli()
+    else:
+        run_gui()
