@@ -10,8 +10,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QByteArray
 from PyQt6.QtGui import QDrag, QFont, QMouseEvent
 
 from modules.models import (
-    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO,
+    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
 )
 from .styles import (
     BLOCK_STYLE_MAP, COLORS,
@@ -104,21 +104,21 @@ class BlockWidget(QFrame):
         self._index_label = index_label
 
         # ── Delete Button ──
-        delete_btn = QPushButton("✕")
-        delete_btn.setFixedSize(28, 28)
+        delete_btn = QPushButton("🗑️")
+        delete_btn.setFixedSize(30, 30)
         delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         delete_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
-                color: {COLORS['text_muted']};
+                color: {COLORS['danger']}AA;
                 border: none;
                 border-radius: 14px;
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: 700;
             }}
             QPushButton:hover {{
-                background-color: {COLORS['danger']}33;
-                color: {COLORS['danger']};
+                background-color: {COLORS['danger']};
+                color: white;
             }}
         """)
         delete_btn.clicked.connect(lambda: self.delete_requested.emit(self))
@@ -135,6 +135,8 @@ class BlockWidget(QFrame):
         elif self.block.type == BLOCK_SUB_MACRO:
             fname = os.path.basename(self.block.macro_file) if self.block.macro_file else "Not set"
             return f"File: {fname}"
+        elif self.block.type == BLOCK_SCROLL:
+            return f"Position: ({self.block.rel_x}, {self.block.rel_y})  ·  Amount: {self.block.amount}"
         return ""
 
     def update_display(self):

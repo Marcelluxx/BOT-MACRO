@@ -130,14 +130,26 @@ class TimelineWidget(QScrollArea):
 
         if index < 0 or index >= len(self._block_widgets):
             self._block_widgets.append(widget)
-            # Insert before the stretch at the end
-            self._layout.addWidget(widget)
         else:
             self._block_widgets.insert(index, widget)
-            # +1 to account for potential empty label (hidden but present)
-            layout_index = index
-            self._layout.insertWidget(layout_index, widget)
 
+        self._rebuild_layout()
+
+    def _rebuild_layout(self):
+        """Rebuilds the visual layout to perfectly match the _block_widgets array."""
+        # 1. Remove all items from layout without destroying the widgets
+        while self._layout.count():
+            item = self._layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+                
+        # 2. Add back the empty label
+        self._layout.addWidget(self._empty_label)
+        
+        # 3. Add back all block widgets in the correct order
+        for w in self._block_widgets:
+            self._layout.addWidget(w)
+            
         self._reindex()
 
     def _reindex(self):
@@ -202,18 +214,20 @@ class TimelineWidget(QScrollArea):
         drop_index = self._get_drop_index(event.position().toPoint())
 
         if source == "timeline" and source_index >= 0:
-            # Reorder: remove from old position and insert at new
+            # Reorder: move the existing widget instead of destroying and recreating
             if 0 <= source_index < len(self._block_widgets):
-                old_widget = self._block_widgets[source_index]
-                self._block_widgets.remove(old_widget)
-                self._layout.removeWidget(old_widget)
-                old_widget.deleteLater()
-
-                # Adjust index if needed
                 if drop_index > source_index:
-                    drop_index -= 1
-
-            self._add_block_widget(block, drop_index)
+                    drop_index -= 1  # Adjust for removal
+                
+                if drop_index != source_index:
+                    # Remove from current logical position
+                    widget = self._block_widgets.pop(source_index)
+                    
+                    # Insert at new logical position
+                    self._block_widgets.insert(drop_index, widget)
+                    
+                    # Force visual update
+                    self._rebuild_layout()
         else:
             # Insert new from toolbox
             self._add_block_widget(block, drop_index)

@@ -11,8 +11,8 @@ import winsound
 from pynput import mouse
 from typing import List, Dict, Any, Optional
 from .models import (
-    Macro, Block, ClickBlock, VisionScanBlock,
-    BLOCK_CLICK, BLOCK_VISION_SCAN,
+    Macro, Block, ClickBlock, VisionScanBlock, ScrollBlock,
+    BLOCK_CLICK, BLOCK_VISION_SCAN, BLOCK_SCROLL,
 )
 
 
@@ -57,6 +57,40 @@ class Recorder:
         else:
             print("[Recorder] Click outside emulator window. Ignored.")
 
+    def on_scroll(self, x: float, y: float, dx: float, dy: float):
+        """Handles mouse scroll events during recording."""
+        if not self.is_recording:
+            return
+
+        rect = self.window_manager.get_window_rect()
+        if not rect:
+            return
+
+        win_x, win_y, win_w, win_h = rect
+
+        # Check if scroll is inside the window
+        if win_x <= x <= win_x + win_w and win_y <= y <= win_y + win_h:
+            rel_x = int(x - win_x)
+            rel_y = int(y - win_y)
+
+            current_time = time.time()
+            if self.last_time is None:
+                delay = 0.5
+            else:
+                delay = current_time - self.last_time
+            self.last_time = current_time
+
+            # dy is the scroll amount (usually 1 or -1 per notch)
+            # We multiply by a factor if needed, but pynput's dy is standard
+            block = ScrollBlock(
+                rel_x=rel_x,
+                rel_y=rel_y,
+                amount=int(dy * 120),  # Normalize to Windows wheel units (120 per notch)
+                delay=round(delay, 3)
+            )
+            self.blocks.append(block)
+            print(f"[Recorder] Recorded scroll at ({rel_x}, {rel_y}) amount={dy} after {delay:.2f}s delay.")
+
     def insert_flag(self, threshold: float = 0.8):
         """
         Inserts a vision_scan flag/checkpoint at the current position in the recording.
@@ -83,7 +117,7 @@ class Recorder:
         self.blocks = []
         self.last_time = None
         self.is_recording = True
-        self.listener = mouse.Listener(on_click=self.on_click)
+        self.listener = mouse.Listener(on_click=self.on_click, on_scroll=self.on_scroll)
         self.listener.start()
         print("[Recorder] Started recording. Press F7 to insert vision scan flags.")
 

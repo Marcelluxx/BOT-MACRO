@@ -11,8 +11,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from modules.models import (
-    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO,
+    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
     list_saved_macros,
 )
 from .styles import COLORS, BLOCK_STYLE_MAP
@@ -135,6 +135,25 @@ class PropertiesPanel(QWidget):
         sub_layout.addLayout(field_layout)
         self._params_layout.addWidget(self._sub_widget)
 
+        # -- Scroll parameters --
+        self._scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(self._scroll_widget)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(8)
+
+        self._scroll_x_spin = self._create_int_field("X Relativo", scroll_layout, -9999, 9999)
+        self._scroll_y_spin = self._create_int_field("Y Relativo", scroll_layout, -9999, 9999)
+        self._scroll_amount_spin = self._create_int_field("Quantità", scroll_layout, -5000, 5000)
+        self._scroll_delay_spin = self._create_float_field("Delay (sec)", scroll_layout, 0.0, 60.0, 0.01)
+
+        # Info label about scroll direction
+        scroll_info = QLabel("ℹ️ Positivo per scorrere su,\nNegativo per scorrere giù.")
+        scroll_info.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px; padding: 4px;")
+        scroll_info.setWordWrap(True)
+        scroll_layout.addWidget(scroll_info)
+
+        self._params_layout.addWidget(self._scroll_widget)
+
         main_layout.addWidget(self._params_group)
         main_layout.addStretch()
 
@@ -176,6 +195,12 @@ class PropertiesPanel(QWidget):
         elif block.type == BLOCK_SUB_MACRO:
             self._sub_widget.show()
             self._refresh_macro_combo(block.macro_file)
+        elif block.type == BLOCK_SCROLL:
+            self._scroll_widget.show()
+            self._scroll_x_spin.setValue(block.rel_x)
+            self._scroll_y_spin.setValue(block.rel_y)
+            self._scroll_amount_spin.setValue(block.amount)
+            self._scroll_delay_spin.setValue(block.delay)
 
         self._updating = False
 
@@ -202,6 +227,7 @@ class PropertiesPanel(QWidget):
         self._delay_widget.hide()
         self._vision_widget.hide()
         self._sub_widget.hide()
+        self._scroll_widget.hide()
 
     def _create_int_field(self, label_text: str, layout: QVBoxLayout, min_val: int, max_val: int) -> QSpinBox:
         """Creates a labeled integer spin box."""
@@ -278,5 +304,10 @@ class PropertiesPanel(QWidget):
         elif block.type == BLOCK_SUB_MACRO:
             idx = self._macro_file_combo.currentIndex()
             block.macro_file = self._macro_file_combo.itemData(idx) or ""
+        elif block.type == BLOCK_SCROLL:
+            block.rel_x = self._scroll_x_spin.value()
+            block.rel_y = self._scroll_y_spin.value()
+            block.amount = self._scroll_amount_spin.value()
+            block.delay = self._scroll_delay_spin.value()
 
         self.block_updated.emit()

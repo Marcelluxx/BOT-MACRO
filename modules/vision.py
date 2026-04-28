@@ -120,6 +120,13 @@ class Vision:
             List of (x, y, w, h) bounding boxes in image-local coordinates.
         """
         template_w, template_h = template.shape[::-1]
+        img_h, img_w = gray_img.shape
+
+        # Prevent OpenCV crash if template is larger than search region
+        if template_w > img_w or template_h > img_h:
+            print(f"[Vision] Warning: Template ({template_w}x{template_h}) is larger than search region ({img_w}x{img_h}). Skipping.")
+            return []
+
         res = cv2.matchTemplate(gray_img, template, cv2.TM_CCOEFF_NORMED)
 
         # Find all locations above threshold

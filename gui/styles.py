@@ -13,9 +13,9 @@ COLORS = {
     "bg_hover":     "#3A414A",
 
     # Text
-    "text_primary":   "#E6EDF3",
-    "text_secondary": "#8B949E",
-    "text_muted":     "#6E7681",
+    "text_primary":   "#FFFFFF",
+    "text_secondary": "#E6EDF3",
+    "text_muted":     "#B1BAC4",
 
     # Accent
     "accent":         "#58A6FF",
@@ -31,6 +31,8 @@ COLORS = {
     "block_vision_light":"#34D399",
     "block_sub":         "#8B5CF6",
     "block_sub_light":   "#A78BFA",
+    "block_scroll":      "#EC4899",
+    "block_scroll_light": "#F472B6",
 
     # Status
     "success":   "#3FB950",
@@ -43,7 +45,7 @@ COLORS = {
     "border_focus": "#58A6FF",
 
     # Drag indicator
-    "drop_indicator": "#58A6FF",
+    "drop_indicator": "#79C0FF",
 }
 
 
@@ -72,6 +74,12 @@ BLOCK_STYLE_MAP = {
         "bg_light": COLORS["block_sub_light"],
         "icon": "📂",
         "label": "Sub-Macro",
+    },
+    "scroll": {
+        "bg": COLORS["block_scroll"],
+        "bg_light": COLORS["block_scroll_light"],
+        "icon": "↕️",
+        "label": "Scroll",
     },
 }
 
@@ -305,14 +313,14 @@ def block_widget_style(block_type: str) -> str:
     bg = style_info["bg"]
     return f"""
         QFrame#blockFrame {{
-            background-color: {bg}22;
-            border: 2px solid {bg}66;
+            background-color: {bg}11;
+            border: 1px solid {bg}33;
             border-radius: 8px;
             margin: 2px 4px;
         }}
         QFrame#blockFrame:hover {{
-            border-color: {bg};
-            background-color: {bg}33;
+            border-color: {bg}88;
+            background-color: {bg}22;
         }}
     """
 
@@ -323,7 +331,7 @@ def block_widget_selected_style(block_type: str) -> str:
     bg = style_info["bg"]
     return f"""
         QFrame#blockFrame {{
-            background-color: {bg}44;
+            background-color: {bg}22;
             border: 2px solid {bg};
             border-radius: 8px;
             margin: 2px 4px;

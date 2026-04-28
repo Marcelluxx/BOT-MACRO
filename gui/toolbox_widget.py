@@ -12,8 +12,8 @@ from PyQt6.QtCore import Qt, QMimeData, QByteArray
 from PyQt6.QtGui import QDrag, QFont, QMouseEvent
 
 from modules.models import (
-    ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO,
+    ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
     list_saved_macros,
 )
 from .block_widget import BlockWidget
@@ -83,6 +83,8 @@ class DraggableBlockTemplate(QFrame):
             return VisionScanBlock(threshold=0.8)
         elif self.block_type == BLOCK_SUB_MACRO:
             return SubMacroBlock(macro_file="")
+        elif self.block_type == BLOCK_SCROLL:
+            return ScrollBlock(rel_x=0, rel_y=0, amount=120, delay=0.5)
         return ClickBlock()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -227,7 +229,7 @@ class ToolboxWidget(QWidget):
         templates_layout.setContentsMargins(8, 8, 8, 8)
         templates_layout.setSpacing(4)
 
-        for block_type in [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO]:
+        for block_type in [BLOCK_CLICK, BLOCK_SCROLL, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO]:
             template = DraggableBlockTemplate(block_type)
             templates_layout.addWidget(template)
 

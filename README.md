@@ -1,72 +1,91 @@
-# Desktop Automation Bot 🤖
+# BOT-MACRO — Visual Automation Bot 🤖
 
-Un bot di automazione modulare in Python progettato per giochi mobile in esecuzione su emulatori Android (come BlueStacks, LDPlayer) su Windows.
+**BOT-MACRO** è un software di automazione professionale progettato per emulatori Android (LDPlayer, BlueStacks) e applicazioni Windows. A differenza dei semplici registratori di macro, offre un **Editor Visuale Drag & Drop** e un sistema di **Visione Artificiale** intelligente per gestire popup e imprevisti.
+
+---
 
 ## 🌟 Funzionalità Principali
 
-*   **Window Management Avanzato:** Trova dinamicamente la finestra dell'emulatore. Se sposti la finestra durante l'esecuzione o tra la registrazione e la riproduzione, il bot adatta automaticamente le coordinate.
-*   **Registrazione Macro Relativa:** Registra i click del mouse convertendoli in coordinate relative rispetto alla finestra dell'emulatore.
-*   **Riproduzione Anti-Ban:**
-    *   **Easing Movimenti:** I movimenti del mouse non sono teletrasporti istantanei, ma seguono curve di accelerazione/decelerazione naturali (`pyautogui.easeOutQuad`).
-    *   **Offset Casuali:** I click avvengono in un raggio di +/- 3 pixel rispetto al punto originale per simulare l'imprecisione umana.
-    *   **Latenze Dinamiche:** I tempi di attesa tra un'azione e l'altra includono una piccola latenza casuale extra.
-*   **Computer Vision (OpenCV):** Modulo predisposto per il template matching (es. per chiudere banner o rilevare stati del gioco in tempo reale).
-*   **Fail-Safe Globali:** Hotkey di blocco emergenza (`ESC`) e sistema di fail-safe nativo spostando il mouse in uno degli angoli dello schermo.
+*   **🎨 Editor Visuale:** Costruisci le tue macro trascinando blocchi-azione (Click, Delay, Vision Scan, Sub-Macro).
+*   **🖱️ Registrazione Intelligente:** Registra i tuoi click in tempo reale. Usa **F7** durante la registrazione per inserire "Checkpoints" di visione.
+*   **👁️ Multi-Asset Vision:** Il bot "vede" lo schermo. Riconosce automaticamente tutti i pulsanti/immagini nella cartella `assets/` e li clicca per chiudere popup o confermare azioni.
+*   **♻️ Gestione Popup a Strati:** Se ci sono più popup sovrapposti, il bot li chiude uno alla volta rinfrescando lo screenshot dopo ogni click.
+*   **🛡️ Sistema Anti-Ban:**
+    *   **Movimenti Umani:** Il mouse si muove con curve di accelerazione naturali.
+    *   **Randomizzazione:** Ogni click ha un piccolo offset casuale (+/- 3px) e ritardi variabili per simulare un utente umano.
+*   **🧩 Modularità:** Puoi creare piccole macro e inserirle dentro macro più grandi come "sotto-azioni".
 
-## 🛠️ Architettura
+---
 
-Il progetto segue rigidi standard di modularità (PEP 8, Type Hinting, Docstrings):
+## 🚀 Installazione Rapida
 
-*   `main.py`: Entry point. Inizializza i moduli, gestisce gli hotkeys globali (tramite la libreria `keyboard`) e avvia il Game Loop in un thread separato.
-*   `window_manager.py`: Interfaccia con le API di Windows (`win32gui`) per trovare la finestra tramite titolo, estrarne il bounding box e portarla in primo piano.
-*   `recorder.py`: Ascolta i click globali del mouse (`pynput.mouse`), calcola le posizioni relative basandosi sui dati di `window_manager` e salva su `macro.json`.
-*   `player.py`: Legge il file JSON ed esegue i click ricalcolando le coordinate assolute in base alla posizione attuale della finestra. Include micro-attese per consentire l'interruzione immediata.
-*   `vision.py`: Cattura lo schermo in modo ultrarapido tramite `mss` ed elabora i match con OpenCV (`cv2.matchTemplate`).
-*   `utils.py`: Funzioni di supporto matematico e logico per l'anti-ban (movimenti pseudo-umani, calcolo degli offset).
-
-## 🚀 Setup e Installazione
-
-1.  **Creare un Virtual Environment:**
+1.  **Requisiti:** Assicurati di avere [Python 3.10+](https://www.python.org/downloads/) installato.
+2.  **Clona o scarica** questo progetto sul tuo PC.
+3.  **Crea un ambiente virtuale (consigliato):**
     ```bash
     python -m venv .venv
+    .venv\Scripts\activate
     ```
-2.  **Attivare l'ambiente virtuale:**
-    *   Su Windows:
-        ```bash
-        .venv\Scripts\activate
-        ```
-3.  **Installare le dipendenze:**
+4.  **Installa le dipendenze:**
     ```bash
     pip install -r requirements.txt
     ```
 
-## ⚙️ Configurazione Iniziale
+---
 
-Prima di lanciare il bot, è **fondamentale** indicare il titolo esatto della finestra del tuo emulatore.
-1.  Apri il tuo emulatore.
-2.  Annota il nome che appare in alto a sinistra sulla barra del titolo della finestra di Windows (es. `"BlueStacks App Player"` o `"LDPlayer"`).
-3.  Apri `main.py` e modifica la costante `WINDOW_TITLE`:
-    ```python
-    WINDOW_TITLE = "Nome Esatto Della Finestra"
-    ```
+## 🎮 Guida all'Uso (GUI)
 
-## 🎮 Come Utilizzare il Bot
-
-Avvia il bot da terminale:
+Lancia l'interfaccia grafica con:
 ```bash
 python main.py
 ```
 
-### Hotkeys Globali
+### 1. Preparazione Assets
+Inserisci nella cartella `assets/` i file `.png` delle immagini che vuoi che il bot riconosca (es. la "X" rossa per chiudere i popup, il tasto "OK", ecc.). Il bot scansionerà questa cartella automaticamente.
 
-Una volta avviato, il bot ascolterà in background queste scorciatoie da tastiera, indipendentemente da quale finestra sia attiva:
+### 2. Creare una Macro
+Esistono due modi per costruire la tua automazione:
 
-*   `F8` - **Inizia / Ferma Registrazione:** 
-    1.  Premi F8. Il bot inizierà a registrare i tuoi click.
-    2.  Clicca i punti dell'emulatore. Tutti i click fuori dalla finestra verranno ignorati.
-    3.  Premi di nuovo F8 per fermare. I dati verranno salvati nel file `macro.json`.
-*   `F9` - **Avvia / Ferma Riproduzione:** 
-    Avvia un loop infinito. Il bot eseguirà i movimenti del mouse con animazioni fluide, offset causali e calcoli relativi alla posizione in tempo reale della finestra. Premi di nuovo F9 per tornare allo stato di riposo (IDLE).
-*   `ESC` - **Arresto di Emergenza:** Termina brutalmente e immediatamente l'esecuzione del programma.
+*   **Metodo Manuale:** Trascina i blocchi dal pannello sinistro (**Toolbox**) al centro (**Timeline**).
+*   **Metodo Registrazione:**
+    1.  Clicca **⏺ Registra** (o premi **F8**).
+    2.  Esegui i click sull'emulatore.
+    3.  **IMPORTANTE:** Se appare un popup o vuoi che in quel punto il bot controlli se ci sono pulsanti da cliccare, premi **F7**. Verrà inserita una "Flag" di visione.
+    4.  Premi di nuovo **F8** per fermare.
 
-*(Alternativa Fail-Safe: Se muovi fisicamente e rapidamente il tuo mouse in uno dei 4 angoli estremi del tuo monitor, il bot si fermerà lanciando un'eccezione di fail-safe).*
+### 3. Editing Visuale
+*   **Riordina:** Trascina i blocchi su e giù nella timeline per cambiare l'ordine.
+*   **Modifica:** Clicca su un blocco per vederne le proprietà a destra (coordinate, tempi di attesa, soglia di precisione della visione).
+*   **Sub-Macro:** Trascina un file salvato dalla sezione "Azioni Salvate" per eseguire una macro dentro l'altra.
+
+### 4. Esecuzione
+Premi **▶ Esegui** (o **F9**). Il bot porterà in primo piano la finestra dell'emulatore (default: "LDPlayer") e inizierà il loop.
+
+---
+
+## ⌨️ Scorciatoie da Tastiera (Hotkeys)
+
+Questi tasti funzionano globalmente, anche se l'app è in background:
+
+| Tasto | Funzione |
+| :--- | :--- |
+| **F7** | **Inserisci Flag Visione** (Solo durante registrazione) |
+| **F8** | **Avvia / Ferma Registrazione** |
+| **F9** | **Avvia / Ferma Riproduzione (Loop)** |
+| **ESC** | **STOP DI EMERGENZA** (Chiude tutto istantaneamente) |
+
+---
+
+## ⚙️ Configurazione Avanzata
+
+Se la tua finestra dell'emulatore ha un nome diverso da "LDPlayer":
+1.  Apri `main.py`.
+2.  Cambia la costante `WINDOW_TITLE` (riga 46 per CLI, riga 38 per GUI in `gui/main_window.py`).
+
+---
+
+## 🛠️ Risoluzione Problemi
+
+*   **Il bot non clicca nel punto giusto:** Assicurati che l'emulatore non sia ridimensionato in modo strano. Il bot usa coordinate relative alla finestra, ma la risoluzione interna deve essere coerente.
+*   **Il Vision Scan non trova i pulsanti:** Controlla che le immagini in `assets/` siano ritagliate in modo preciso e abbiano lo sfondo trasparente o coerente con il gioco. Prova ad abbassare la "Soglia" (Threshold) nelle proprietà del blocco Vision Scan (es. 0.7 invece di 0.8).
+*   **Arresto di Emergenza:** Se il bot impazzisce, muovi il mouse velocemente in uno dei **quattro angoli dello schermo** per attivare il fail-safe di PyAutoGUI.

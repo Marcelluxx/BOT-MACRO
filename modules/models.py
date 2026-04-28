@@ -14,14 +14,16 @@ BLOCK_CLICK = "click"
 BLOCK_DELAY = "delay"
 BLOCK_VISION_SCAN = "vision_scan"
 BLOCK_SUB_MACRO = "sub_macro"
+BLOCK_SCROLL = "scroll"
 
-ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO]
+ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL]
 
 BLOCK_COLORS = {
     BLOCK_CLICK:       "#3B82F6",  # Blue
     BLOCK_DELAY:       "#F59E0B",  # Amber
     BLOCK_VISION_SCAN: "#10B981",  # Emerald
     BLOCK_SUB_MACRO:   "#8B5CF6",  # Violet
+    BLOCK_SCROLL:      "#EC4899",  # Pink
 }
 
 BLOCK_ICONS = {
@@ -29,6 +31,7 @@ BLOCK_ICONS = {
     BLOCK_DELAY:       "⏱️",
     BLOCK_VISION_SCAN: "👁️",
     BLOCK_SUB_MACRO:   "📂",
+    BLOCK_SCROLL:      "↕️",
 }
 
 BLOCK_LABELS = {
@@ -36,6 +39,7 @@ BLOCK_LABELS = {
     BLOCK_DELAY:       "Delay",
     BLOCK_VISION_SCAN: "Vision Scan",
     BLOCK_SUB_MACRO:   "Sub-Macro",
+    BLOCK_SCROLL:      "Scroll",
 }
 
 
@@ -63,6 +67,13 @@ class Block:
             return VisionScanBlock(threshold=data.get("threshold", 0.8))
         elif block_type == BLOCK_SUB_MACRO:
             return SubMacroBlock(macro_file=data.get("macro_file", ""))
+        elif block_type == BLOCK_SCROLL:
+            return ScrollBlock(
+                rel_x=data.get("rel_x", 0),
+                rel_y=data.get("rel_y", 0),
+                amount=data.get("amount", 0),
+                delay=data.get("delay", 0.5),
+            )
         else:
             # Fallback: treat unknown as click
             return ClickBlock(
@@ -96,6 +107,15 @@ class VisionScanBlock(Block):
 class SubMacroBlock(Block):
     type: str = field(default=BLOCK_SUB_MACRO, init=False)
     macro_file: str = ""
+
+
+@dataclass
+class ScrollBlock(Block):
+    type: str = field(default=BLOCK_SCROLL, init=False)
+    rel_x: int = 0
+    rel_y: int = 0
+    amount: int = 0  # Positive for up, negative for down
+    delay: float = 0.5
 
 
 # ── Macro Container ─────────────────────────────────────────────────

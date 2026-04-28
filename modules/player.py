@@ -9,8 +9,8 @@ import random
 from typing import List, Dict, Any, Optional, Callable
 import pyautogui
 from .models import (
-    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO,
+    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
 )
 from .utils import random_offset, human_move_to
 from .vision import Vision
@@ -88,6 +88,8 @@ class Player:
             self._execute_vision_scan(block, check_stop_callback)
         elif block.type == BLOCK_SUB_MACRO:
             self._execute_sub_macro(block, check_stop_callback, depth)
+        elif block.type == BLOCK_SCROLL:
+            self._execute_scroll(block, check_stop_callback)
         else:
             print(f"[Player] Unknown block type: {block.type}. Skipping.")
 
@@ -117,6 +119,30 @@ class Player:
         human_move_to(target_x, target_y)
         pyautogui.click(target_x, target_y)
         print(f"[Player] Clicked at absolute ({target_x}, {target_y})")
+
+    def _execute_scroll(self, block: ScrollBlock, check_stop_callback):
+        """Executes a scroll block."""
+        # Wait for the recorded delay
+        self._safe_sleep(block.delay, check_stop_callback)
+
+        if not self.is_playing or (check_stop_callback and check_stop_callback()):
+            return
+
+        rect = self.window_manager.get_window_rect()
+        if not rect:
+            print("[Player] Emulator window not found. Skipping scroll.")
+            return
+
+        win_x, win_y, win_w, win_h = rect
+
+        # Convert to absolute coordinates
+        abs_x = win_x + block.rel_x
+        abs_y = win_y + block.rel_y
+
+        # Move mouse to position before scrolling
+        human_move_to(abs_x, abs_y)
+        pyautogui.scroll(block.amount, x=abs_x, y=abs_y)
+        print(f"[Player] Scrolled {block.amount} at absolute ({abs_x}, {abs_y})")
 
     def _execute_delay(self, block: DelayBlock, check_stop_callback):
         """Executes a delay block."""
