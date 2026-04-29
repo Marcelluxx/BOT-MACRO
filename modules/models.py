@@ -15,8 +15,10 @@ BLOCK_DELAY = "delay"
 BLOCK_VISION_SCAN = "vision_scan"
 BLOCK_SUB_MACRO = "sub_macro"
 BLOCK_SCROLL = "scroll"
+BLOCK_DRAG = "drag"
+BLOCK_PERIODIC = "periodic"
 
-ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL]
+ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC]
 
 BLOCK_COLORS = {
     BLOCK_CLICK:       "#3B82F6",  # Blue
@@ -24,6 +26,8 @@ BLOCK_COLORS = {
     BLOCK_VISION_SCAN: "#10B981",  # Emerald
     BLOCK_SUB_MACRO:   "#8B5CF6",  # Violet
     BLOCK_SCROLL:      "#EC4899",  # Pink
+    BLOCK_DRAG:        "#F97316",  # Orange
+    BLOCK_PERIODIC:    "#06B6D4",  # Cyan
 }
 
 BLOCK_ICONS = {
@@ -32,6 +36,8 @@ BLOCK_ICONS = {
     BLOCK_VISION_SCAN: "👁️",
     BLOCK_SUB_MACRO:   "📂",
     BLOCK_SCROLL:      "↕️",
+    BLOCK_DRAG:        "🤚",
+    BLOCK_PERIODIC:    "🔄",
 }
 
 BLOCK_LABELS = {
@@ -40,6 +46,8 @@ BLOCK_LABELS = {
     BLOCK_VISION_SCAN: "Vision Scan",
     BLOCK_SUB_MACRO:   "Sub-Macro",
     BLOCK_SCROLL:      "Scroll",
+    BLOCK_DRAG:        "Drag",
+    BLOCK_PERIODIC:    "Periodic",
 }
 
 
@@ -73,6 +81,20 @@ class Block:
                 rel_y=data.get("rel_y", 0),
                 amount=data.get("amount", 0),
                 delay=data.get("delay", 0.5),
+            )
+        elif block_type == BLOCK_DRAG:
+            return DragBlock(
+                start_x=data.get("start_x", 0),
+                start_y=data.get("start_y", 0),
+                end_x=data.get("end_x", 0),
+                end_y=data.get("end_y", 0),
+                duration=data.get("duration", 0.5),
+                delay=data.get("delay", 0.5),
+            )
+        elif block_type == BLOCK_PERIODIC:
+            return PeriodicBlock(
+                n_iterations=data.get("n_iterations", 5),
+                macro_file=data.get("macro_file", ""),
             )
         else:
             # Fallback: treat unknown as click
@@ -116,6 +138,24 @@ class ScrollBlock(Block):
     rel_y: int = 0
     amount: int = 0  # Positive for up, negative for down
     delay: float = 0.5
+
+
+@dataclass
+class DragBlock(Block):
+    type: str = field(default=BLOCK_DRAG, init=False)
+    start_x: int = 0
+    start_y: int = 0
+    end_x: int = 0
+    end_y: int = 0
+    duration: float = 0.5
+    delay: float = 0.5
+
+
+@dataclass
+class PeriodicBlock(Block):
+    type: str = field(default=BLOCK_PERIODIC, init=False)
+    n_iterations: int = 5
+    macro_file: str = ""
 
 
 # ── Macro Container ─────────────────────────────────────────────────

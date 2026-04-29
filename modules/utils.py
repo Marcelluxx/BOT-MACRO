@@ -45,6 +45,6 @@ def human_move_to(x: int, y: int, min_duration: float = 0.1, max_duration: float
         min_duration (float): Minimum time the movement should take.
         max_duration (float): Maximum time the movement should take.
     """
-    duration = random.uniform(min_duration, max_duration)
+    duration = 0.2  # Fixed duration for deterministic behavior
     # Use easeOutQuad for a human-like deceleration towards the target
     pyautogui.moveTo(x, y, duration=duration, tween=pyautogui.easeOutQuad)

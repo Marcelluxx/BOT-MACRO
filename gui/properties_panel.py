@@ -11,8 +11,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from modules.models import (
-    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
+    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, PeriodicBlock, DragBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_PERIODIC, BLOCK_DRAG,
     list_saved_macros,
 )
 from .styles import COLORS, BLOCK_STYLE_MAP
@@ -154,6 +154,43 @@ class PropertiesPanel(QWidget):
 
         self._params_layout.addWidget(self._scroll_widget)
 
+        # -- Periodic parameters --
+        self._periodic_widget = QWidget()
+        periodic_layout = QVBoxLayout(self._periodic_widget)
+        periodic_layout.setContentsMargins(0, 0, 0, 0)
+        periodic_layout.setSpacing(8)
+
+        self._n_iter_spin = self._create_int_field("Ogni N cicli", periodic_layout, 1, 9999)
+        
+        field_layout = QHBoxLayout()
+        field_label = QLabel("File Macro")
+        field_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        field_label.setFixedWidth(80)
+        field_layout.addWidget(field_label)
+
+        self._periodic_macro_combo = QComboBox()
+        self._periodic_macro_combo.setMinimumHeight(30)
+        self._periodic_macro_combo.currentTextChanged.connect(self._on_param_changed)
+        field_layout.addWidget(self._periodic_macro_combo)
+        periodic_layout.addLayout(field_layout)
+
+        self._params_layout.addWidget(self._periodic_widget)
+
+        # -- Drag parameters --
+        self._drag_widget = QWidget()
+        drag_layout = QVBoxLayout(self._drag_widget)
+        drag_layout.setContentsMargins(0, 0, 0, 0)
+        drag_layout.setSpacing(8)
+
+        self._drag_start_x = self._create_int_field("Inizio X", drag_layout, -9999, 9999)
+        self._drag_start_y = self._create_int_field("Inizio Y", drag_layout, -9999, 9999)
+        self._drag_end_x = self._create_int_field("Fine X", drag_layout, -9999, 9999)
+        self._drag_end_y = self._create_int_field("Fine Y", drag_layout, -9999, 9999)
+        self._drag_duration = self._create_float_field("Durata (sec)", drag_layout, 0.0, 60.0, 0.1)
+        self._drag_delay = self._create_float_field("Delay (sec)", drag_layout, 0.0, 60.0, 0.1)
+
+        self._params_layout.addWidget(self._drag_widget)
+
         main_layout.addWidget(self._params_group)
         main_layout.addStretch()
 
@@ -201,6 +238,18 @@ class PropertiesPanel(QWidget):
             self._scroll_y_spin.setValue(block.rel_y)
             self._scroll_amount_spin.setValue(block.amount)
             self._scroll_delay_spin.setValue(block.delay)
+        elif block.type == BLOCK_PERIODIC:
+            self._periodic_widget.show()
+            self._n_iter_spin.setValue(block.n_iterations)
+            self._refresh_macro_combo_for_periodic(block.macro_file)
+        elif block.type == BLOCK_DRAG:
+            self._drag_widget.show()
+            self._drag_start_x.setValue(block.start_x)
+            self._drag_start_y.setValue(block.start_y)
+            self._drag_end_x.setValue(block.end_x)
+            self._drag_end_y.setValue(block.end_y)
+            self._drag_duration.setValue(block.duration)
+            self._drag_delay.setValue(block.delay)
 
         self._updating = False
 
@@ -228,6 +277,8 @@ class PropertiesPanel(QWidget):
         self._vision_widget.hide()
         self._sub_widget.hide()
         self._scroll_widget.hide()
+        self._periodic_widget.hide()
+        self._drag_widget.hide()
 
     def _create_int_field(self, label_text: str, layout: QVBoxLayout, min_val: int, max_val: int) -> QSpinBox:
         """Creates a labeled integer spin box."""
@@ -286,6 +337,23 @@ class PropertiesPanel(QWidget):
 
         self._macro_file_combo.blockSignals(False)
 
+    def _refresh_macro_combo_for_periodic(self, current_value: str = ""):
+        """Refreshes the periodic macro file combo box."""
+        self._periodic_macro_combo.blockSignals(True)
+        self._periodic_macro_combo.clear()
+        self._periodic_macro_combo.addItem("-- Seleziona --", "")
+
+        for filepath in list_saved_macros("actions"):
+            display = os.path.splitext(os.path.basename(filepath))[0]
+            self._periodic_macro_combo.addItem(display, filepath)
+
+        if current_value:
+            idx = self._periodic_macro_combo.findData(current_value)
+            if idx >= 0:
+                self._periodic_macro_combo.setCurrentIndex(idx)
+
+        self._periodic_macro_combo.blockSignals(False)
+
     def _on_param_changed(self):
         """Writes changed parameter values back to the block model."""
         if self._updating or not self._current_block:
@@ -309,5 +377,16 @@ class PropertiesPanel(QWidget):
             block.rel_y = self._scroll_y_spin.value()
             block.amount = self._scroll_amount_spin.value()
             block.delay = self._scroll_delay_spin.value()
+        elif block.type == BLOCK_PERIODIC:
+            block.n_iterations = self._n_iter_spin.value()
+            idx = self._periodic_macro_combo.currentIndex()
+            block.macro_file = self._periodic_macro_combo.itemData(idx) or ""
+        elif block.type == BLOCK_DRAG:
+            block.start_x = self._drag_start_x.value()
+            block.start_y = self._drag_start_y.value()
+            block.end_x = self._drag_end_x.value()
+            block.end_y = self._drag_end_y.value()
+            block.duration = self._drag_duration.value()
+            block.delay = self._drag_delay.value()
 
         self.block_updated.emit()

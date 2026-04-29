@@ -33,6 +33,10 @@ COLORS = {
     "block_sub_light":   "#A78BFA",
     "block_scroll":      "#EC4899",
     "block_scroll_light": "#F472B6",
+    "block_drag":        "#F97316",
+    "block_drag_light":  "#FB923C",
+    "block_periodic":    "#06B6D4",
+    "block_periodic_light":"#22D3EE",
 
     # Status
     "success":   "#3FB950",
@@ -80,6 +84,18 @@ BLOCK_STYLE_MAP = {
         "bg_light": COLORS["block_scroll_light"],
         "icon": "↕️",
         "label": "Scroll",
+    },
+    "drag": {
+        "bg": COLORS["block_drag"],
+        "bg_light": COLORS["block_drag_light"],
+        "icon": "🤚",
+        "label": "Drag",
+    },
+    "periodic": {
+        "bg": COLORS["block_periodic"],
+        "bg_light": COLORS["block_periodic_light"],
+        "icon": "🔄",
+        "label": "Periodic",
     },
 }
 

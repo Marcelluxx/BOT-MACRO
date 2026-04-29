@@ -9,8 +9,8 @@ import random
 from typing import List, Dict, Any, Optional, Callable
 import pyautogui
 from .models import (
-    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
+    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, DragBlock, PeriodicBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC,
 )
 from .utils import random_offset, human_move_to
 from .vision import Vision
@@ -23,6 +23,7 @@ class Player:
         self.macro: Optional[Macro] = None
         self.is_playing = False
         self._max_recursion_depth = 5  # Prevent infinite sub-macro loops
+        self.iteration_count = 0  # Tracks main loop iterations for periodic blocks
 
     def load_macro(self, filename: str = "actions/macro.json") -> bool:
         """
@@ -58,7 +59,8 @@ class Player:
 
         self.is_playing = True
         if _depth == 0:
-            print(f"[Player] Started playback of '{self.macro.name}'.")
+            self.iteration_count += 1
+            print(f"[Player] Started playback of '{self.macro.name}' (Iteration {self.iteration_count}).")
         else:
             print(f"[Player] {'  ' * _depth}Executing sub-macro '{self.macro.name}'...")
 
@@ -90,6 +92,10 @@ class Player:
             self._execute_sub_macro(block, check_stop_callback, depth)
         elif block.type == BLOCK_SCROLL:
             self._execute_scroll(block, check_stop_callback)
+        elif block.type == BLOCK_DRAG:
+            self._execute_drag(block, check_stop_callback)
+        elif block.type == BLOCK_PERIODIC:
+            self._execute_periodic(block, check_stop_callback, depth)
         else:
             print(f"[Player] Unknown block type: {block.type}. Skipping.")
 
@@ -112,13 +118,10 @@ class Player:
         abs_x = win_x + block.rel_x
         abs_y = win_y + block.rel_y
 
-        # Add anti-ban offset
-        target_x, target_y = random_offset(abs_x, abs_y, max_offset=3)
-
         # Move and click
-        human_move_to(target_x, target_y)
-        pyautogui.click(target_x, target_y)
-        print(f"[Player] Clicked at absolute ({target_x}, {target_y})")
+        human_move_to(abs_x, abs_y)
+        pyautogui.click(abs_x, abs_y)
+        print(f"[Player] Clicked at absolute ({abs_x}, {abs_y})")
 
     def _execute_scroll(self, block: ScrollBlock, check_stop_callback):
         """Executes a scroll block."""
@@ -143,6 +146,32 @@ class Player:
         human_move_to(abs_x, abs_y)
         pyautogui.scroll(block.amount, x=abs_x, y=abs_y)
         print(f"[Player] Scrolled {block.amount} at absolute ({abs_x}, {abs_y})")
+
+    def _execute_drag(self, block: DragBlock, check_stop_callback):
+        """Executes a drag block."""
+        # Wait for the recorded delay
+        self._safe_sleep(block.delay, check_stop_callback)
+
+        if not self.is_playing or (check_stop_callback and check_stop_callback()):
+            return
+
+        rect = self.window_manager.get_window_rect()
+        if not rect:
+            print("[Player] Emulator window not found. Skipping drag.")
+            return
+
+        win_x, win_y, win_w, win_h = rect
+
+        # Convert to absolute coordinates
+        abs_start_x = win_x + block.start_x
+        abs_start_y = win_y + block.start_y
+        abs_end_x = win_x + block.end_x
+        abs_end_y = win_y + block.end_y
+
+        # Move to start and drag to end
+        human_move_to(abs_start_x, abs_start_y)
+        pyautogui.dragTo(abs_end_x, abs_end_y, duration=block.duration, button='left')
+        print(f"[Player] Dragged from absolute ({abs_start_x}, {abs_start_y}) to ({abs_end_x}, {abs_end_y})")
 
     def _execute_delay(self, block: DelayBlock, check_stop_callback):
         """Executes a delay block."""
@@ -192,13 +221,12 @@ class Player:
 
             # Click only the FIRST match (topmost popup)
             abs_x, abs_y, asset_name = matches[0]
-            target_x, target_y = random_offset(abs_x, abs_y, max_offset=2)
-            human_move_to(target_x, target_y)
-            pyautogui.click(target_x, target_y)
+            human_move_to(abs_x, abs_y)
+            pyautogui.click(abs_x, abs_y)
             total_clicks += 1
             print(
                 f"[Player] Pass {scan_pass}: clicked '{asset_name}' "
-                f"at ({target_x}, {target_y})  "
+                f"at ({abs_x}, {abs_y})  "
                 f"[{len(matches)} match(es) on screen]"
             )
 
@@ -229,13 +257,33 @@ class Player:
         else:
             print(f"[Player] Failed to load sub-macro: {block.macro_file}")
 
+    def _execute_periodic(self, block: PeriodicBlock, check_stop_callback, depth: int):
+        """Executes a sub-macro only every N iterations of the main loop."""
+        if not block.macro_file:
+            return
+
+        # Check if we should execute this iteration
+        # Using 1-indexed logic for user friendliness: Iteration 5, 10, 15...
+        if self.iteration_count % block.n_iterations == 0:
+            print(f"[Player] 🔄 Periodic trigger: iteration {self.iteration_count} is a multiple of {block.n_iterations}.")
+            
+            sub_player = Player(self.window_manager, self.vision)
+            # Inherit iteration count so it stays consistent across sub-players if needed
+            sub_player.iteration_count = self.iteration_count
+            
+            if sub_player.load_macro(block.macro_file):
+                sub_player.is_playing = self.is_playing
+                sub_player.play(check_stop_callback=check_stop_callback, _depth=depth + 1)
+        else:
+            print(f"[Player] 🔄 Periodic skip: iteration {self.iteration_count} is not a multiple of {block.n_iterations}.")
+
     def stop(self):
         """Signals playback to stop."""
         self.is_playing = False
 
     def _safe_sleep(self, delay: float, check_stop_callback=None):
-        """Sleeps in small chunks to allow for quick interruption and adds random extra time."""
-        target_sleep = delay + random.uniform(0.05, 0.2)
+        """Sleeps in small chunks to allow for quick interruption."""
+        target_sleep = delay
         start = time.time()
         while time.time() - start < target_sleep:
             if not self.is_playing or (check_stop_callback and check_stop_callback()):

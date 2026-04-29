@@ -10,8 +10,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QByteArray
 from PyQt6.QtGui import QDrag, QFont, QMouseEvent
 
 from modules.models import (
-    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL,
+    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, DragBlock, PeriodicBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC,
 )
 from .styles import (
     BLOCK_STYLE_MAP, COLORS,
@@ -137,6 +137,11 @@ class BlockWidget(QFrame):
             return f"File: {fname}"
         elif self.block.type == BLOCK_SCROLL:
             return f"Position: ({self.block.rel_x}, {self.block.rel_y})  ·  Amount: {self.block.amount}"
+        elif self.block.type == BLOCK_DRAG:
+            return f"From ({self.block.start_x}, {self.block.start_y}) to ({self.block.end_x}, {self.block.end_y})  ·  Duration: {self.block.duration:.2f}s"
+        elif self.block.type == BLOCK_PERIODIC:
+            fname = os.path.basename(self.block.macro_file) if self.block.macro_file else "Not set"
+            return f"Every {self.block.n_iterations} iterations  ·  File: {fname}"
         return ""
 
     def update_display(self):

@@ -11,9 +11,10 @@ import winsound
 from pynput import mouse
 from typing import List, Dict, Any, Optional
 from .models import (
-    Macro, Block, ClickBlock, VisionScanBlock, ScrollBlock,
-    BLOCK_CLICK, BLOCK_VISION_SCAN, BLOCK_SCROLL,
+    Macro, Block, ClickBlock, VisionScanBlock, ScrollBlock, DragBlock,
+    BLOCK_CLICK, BLOCK_VISION_SCAN, BLOCK_SCROLL, BLOCK_DRAG,
 )
+import math
 
 
 class Recorder:
@@ -23,10 +24,13 @@ class Recorder:
         self.last_time: Optional[float] = None
         self.listener: Optional[mouse.Listener] = None
         self.is_recording = False
+        self.drag_start_pos = None
+        self.drag_start_time = None
+        self.delay_before_action = 0.5
 
     def on_click(self, x: float, y: float, button: mouse.Button, pressed: bool):
         """Handles mouse click events during recording."""
-        if not pressed or not self.is_recording:
+        if not self.is_recording:
             return
 
         if button != mouse.Button.left:
@@ -38,24 +42,51 @@ class Recorder:
             return
 
         win_x, win_y, win_w, win_h = rect
+        current_time = time.time()
 
-        # Check if click is inside the window
-        if win_x <= x <= win_x + win_w and win_y <= y <= win_y + win_h:
-            rel_x = int(x - win_x)
-            rel_y = int(y - win_y)
-
-            current_time = time.time()
-            if self.last_time is None:
-                delay = 0.5  # Default start delay
+        if pressed:
+            # Check if click started inside the window
+            if win_x <= x <= win_x + win_w and win_y <= y <= win_y + win_h:
+                self.drag_start_pos = (x, y)
+                self.drag_start_time = current_time
+                if self.last_time is None:
+                    self.delay_before_action = 0.5
+                else:
+                    self.delay_before_action = current_time - self.last_time
+                self.last_time = current_time
             else:
-                delay = current_time - self.last_time
-            self.last_time = current_time
-
-            block = ClickBlock(rel_x=rel_x, rel_y=rel_y, delay=round(delay, 3))
-            self.blocks.append(block)
-            print(f"[Recorder] Recorded click at relative ({rel_x}, {rel_y}) after {delay:.2f}s delay.")
+                self.drag_start_pos = None
+                print("[Recorder] Click start outside emulator window. Ignored.")
         else:
-            print("[Recorder] Click outside emulator window. Ignored.")
+            if self.drag_start_pos is None:
+                return  # Ignored start
+
+            start_x, start_y = self.drag_start_pos
+            rel_start_x = int(start_x - win_x)
+            rel_start_y = int(start_y - win_y)
+
+            rel_end_x = int(x - win_x)
+            rel_end_y = int(y - win_y)
+
+            distance = math.hypot(rel_end_x - rel_start_x, rel_end_y - rel_start_y)
+
+            if distance > 10:  # Threshold for drag
+                duration = current_time - self.drag_start_time
+                block = DragBlock(
+                    start_x=rel_start_x, start_y=rel_start_y,
+                    end_x=rel_end_x, end_y=rel_end_y,
+                    duration=round(duration, 3),
+                    delay=round(self.delay_before_action, 3)
+                )
+                self.blocks.append(block)
+                print(f"[Recorder] Recorded drag from ({rel_start_x}, {rel_start_y}) to ({rel_end_x}, {rel_end_y}) duration={duration:.2f}s after {self.delay_before_action:.2f}s delay.")
+            else:
+                block = ClickBlock(rel_x=rel_start_x, rel_y=rel_start_y, delay=round(self.delay_before_action, 3))
+                self.blocks.append(block)
+                print(f"[Recorder] Recorded click at relative ({rel_start_x}, {rel_start_y}) after {self.delay_before_action:.2f}s delay.")
+
+            self.drag_start_pos = None
+            self.last_time = current_time
 
     def on_scroll(self, x: float, y: float, dx: float, dy: float):
         """Handles mouse scroll events during recording."""
