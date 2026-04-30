@@ -17,8 +17,10 @@ BLOCK_SUB_MACRO = "sub_macro"
 BLOCK_SCROLL = "scroll"
 BLOCK_DRAG = "drag"
 BLOCK_PERIODIC = "periodic"
+BLOCK_IMAGE_CHECK = "image_check"
+BLOCK_LOOP = "loop"
 
-ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC]
+ALL_BLOCK_TYPES = [BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC, BLOCK_IMAGE_CHECK, BLOCK_LOOP]
 
 BLOCK_COLORS = {
     BLOCK_CLICK:       "#3B82F6",  # Blue
@@ -28,6 +30,8 @@ BLOCK_COLORS = {
     BLOCK_SCROLL:      "#EC4899",  # Pink
     BLOCK_DRAG:        "#F97316",  # Orange
     BLOCK_PERIODIC:    "#06B6D4",  # Cyan
+    BLOCK_IMAGE_CHECK: "#EF4444",  # Red
+    BLOCK_LOOP:        "#14B8A6",  # Teal
 }
 
 BLOCK_ICONS = {
@@ -38,6 +42,8 @@ BLOCK_ICONS = {
     BLOCK_SCROLL:      "↕️",
     BLOCK_DRAG:        "🤚",
     BLOCK_PERIODIC:    "🔄",
+    BLOCK_IMAGE_CHECK: "🛡️",
+    BLOCK_LOOP:        "🔁",
 }
 
 BLOCK_LABELS = {
@@ -48,6 +54,8 @@ BLOCK_LABELS = {
     BLOCK_SCROLL:      "Scroll",
     BLOCK_DRAG:        "Drag",
     BLOCK_PERIODIC:    "Periodic",
+    BLOCK_IMAGE_CHECK: "Image Check",
+    BLOCK_LOOP:        "Loop",
 }
 
 
@@ -95,6 +103,18 @@ class Block:
             return PeriodicBlock(
                 n_iterations=data.get("n_iterations", 5),
                 macro_file=data.get("macro_file", ""),
+            )
+        elif block_type == BLOCK_IMAGE_CHECK:
+            return ImageCheckBlock(
+                image_path=data.get("image_path", ""),
+                threshold=data.get("threshold", 0.8),
+                on_fail=data.get("on_fail", "abort"),
+            )
+        elif block_type == BLOCK_LOOP:
+            children = [Block.from_dict(c) for c in data.get("children", [])]
+            return LoopBlock(
+                iterations=data.get("iterations", 3),
+                children=children,
             )
         else:
             # Fallback: treat unknown as click
@@ -157,6 +177,25 @@ class PeriodicBlock(Block):
     n_iterations: int = 5
     macro_file: str = ""
 
+@dataclass
+class ImageCheckBlock(Block):
+    type: str = field(default=BLOCK_IMAGE_CHECK, init=False)
+    image_path: str = ""
+    threshold: float = 0.8
+    on_fail: str = "abort"  # "abort" or "continue_loop"
+
+@dataclass
+class LoopBlock(Block):
+    type: str = field(default=BLOCK_LOOP, init=False)
+    iterations: int = 3
+    children: List["Block"] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.type,
+            "iterations": self.iterations,
+            "children": [c.to_dict() for c in self.children],
+        }
 
 # ── Macro Container ─────────────────────────────────────────────────
 @dataclass

@@ -3,17 +3,23 @@ Player module for macro execution.
 Reads the structured JSON macro file and executes all block types
 with anti-ban logic. Supports recursive sub-macro execution.
 """
+import os
 import json
 import time
 import random
 from typing import List, Dict, Any, Optional, Callable
 import pyautogui
 from .models import (
-    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, DragBlock, PeriodicBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC,
+    Macro, Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, DragBlock, PeriodicBlock, ImageCheckBlock, LoopBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_DRAG, BLOCK_PERIODIC, BLOCK_IMAGE_CHECK, BLOCK_LOOP,
 )
 from .utils import random_offset, human_move_to
 from .vision import Vision
+
+
+class ContinueLoopException(Exception):
+    """Raised when a block (like ImageCheck) requests to skip the current loop iteration."""
+    pass
 
 
 class Player:
@@ -24,6 +30,18 @@ class Player:
         self.is_playing = False
         self._max_recursion_depth = 5  # Prevent infinite sub-macro loops
         self.iteration_count = 0  # Tracks main loop iterations for periodic blocks
+
+    def _get_valid_rect(self):
+        """Returns the window rect only if the window is visible and on-screen."""
+        rect = self.window_manager.get_window_rect()
+        if not rect:
+            return None
+        left, top, width, height = rect
+        # Windows uses -32000 for minimized windows
+        if left <= -30000 or top <= -30000 or width <= 0 or height <= 0:
+            print("[Player] Emulator window is minimized or off-screen. Skipping action.")
+            return None
+        return rect
 
     def load_macro(self, filename: str = "actions/macro.json") -> bool:
         """
@@ -41,12 +59,13 @@ class Player:
             print(f"[Player] Error loading macro: {e}")
             return False
 
-    def play(self, check_stop_callback: Optional[Callable[[], bool]] = None, _depth: int = 0):
+    def play(self, check_stop_callback: Optional[Callable[[], bool]] = None, on_abort_callback: Optional[Callable[[], None]] = None, _depth: int = 0):
         """
         Executes the loaded macro sequentially.
 
         Args:
             check_stop_callback: Function that returns True when playback should stop.
+            on_abort_callback: Function called when a terminal failure occurs (e.g. image check fail).
             _depth: Internal recursion counter for sub-macros.
         """
         if not self.macro or not self.macro.blocks:
@@ -69,7 +88,7 @@ class Player:
                 print(f"[Player] Playback interrupted at block {i + 1}.")
                 break
 
-            self._execute_block(block, check_stop_callback, _depth)
+            self._execute_block(block, check_stop_callback, on_abort_callback, _depth)
 
         if _depth == 0:
             self.is_playing = False
@@ -79,6 +98,7 @@ class Player:
         self,
         block: Block,
         check_stop_callback: Optional[Callable[[], bool]],
+        on_abort_callback: Optional[Callable[[], None]],
         depth: int,
     ):
         """Dispatches execution to the appropriate handler based on block type."""
@@ -89,13 +109,17 @@ class Player:
         elif block.type == BLOCK_VISION_SCAN:
             self._execute_vision_scan(block, check_stop_callback)
         elif block.type == BLOCK_SUB_MACRO:
-            self._execute_sub_macro(block, check_stop_callback, depth)
+            self._execute_sub_macro(block, check_stop_callback, on_abort_callback, depth)
         elif block.type == BLOCK_SCROLL:
             self._execute_scroll(block, check_stop_callback)
         elif block.type == BLOCK_DRAG:
             self._execute_drag(block, check_stop_callback)
         elif block.type == BLOCK_PERIODIC:
-            self._execute_periodic(block, check_stop_callback, depth)
+            self._execute_periodic(block, check_stop_callback, on_abort_callback, depth)
+        elif block.type == BLOCK_IMAGE_CHECK:
+            self._execute_image_check(block, check_stop_callback, on_abort_callback)
+        elif block.type == BLOCK_LOOP:
+            self._execute_loop(block, check_stop_callback, on_abort_callback, depth)
         else:
             print(f"[Player] Unknown block type: {block.type}. Skipping.")
 
@@ -107,9 +131,8 @@ class Player:
         if not self.is_playing or (check_stop_callback and check_stop_callback()):
             return
 
-        rect = self.window_manager.get_window_rect()
+        rect = self._get_valid_rect()
         if not rect:
-            print("[Player] Emulator window not found. Skipping click.")
             return
 
         win_x, win_y, win_w, win_h = rect
@@ -118,10 +141,12 @@ class Player:
         abs_x = win_x + block.rel_x
         abs_y = win_y + block.rel_y
 
-        # Move and click
-        human_move_to(abs_x, abs_y)
-        pyautogui.click(abs_x, abs_y)
-        print(f"[Player] Clicked at absolute ({abs_x}, {abs_y})")
+        try:
+            human_move_to(abs_x, abs_y)
+            pyautogui.click(abs_x, abs_y)
+            print(f"[Player] Clicked at absolute ({abs_x}, {abs_y})")
+        except pyautogui.FailSafeException:
+            print(f"[Player] FailSafe triggered at ({abs_x}, {abs_y}). Skipping click.")
 
     def _execute_scroll(self, block: ScrollBlock, check_stop_callback):
         """Executes a scroll block."""
@@ -131,9 +156,8 @@ class Player:
         if not self.is_playing or (check_stop_callback and check_stop_callback()):
             return
 
-        rect = self.window_manager.get_window_rect()
+        rect = self._get_valid_rect()
         if not rect:
-            print("[Player] Emulator window not found. Skipping scroll.")
             return
 
         win_x, win_y, win_w, win_h = rect
@@ -142,10 +166,12 @@ class Player:
         abs_x = win_x + block.rel_x
         abs_y = win_y + block.rel_y
 
-        # Move mouse to position before scrolling
-        human_move_to(abs_x, abs_y)
-        pyautogui.scroll(block.amount, x=abs_x, y=abs_y)
-        print(f"[Player] Scrolled {block.amount} at absolute ({abs_x}, {abs_y})")
+        try:
+            human_move_to(abs_x, abs_y)
+            pyautogui.scroll(block.amount, x=abs_x, y=abs_y)
+            print(f"[Player] Scrolled {block.amount} at absolute ({abs_x}, {abs_y})")
+        except pyautogui.FailSafeException:
+            print(f"[Player] FailSafe triggered at ({abs_x}, {abs_y}). Skipping scroll.")
 
     def _execute_drag(self, block: DragBlock, check_stop_callback):
         """Executes a drag block."""
@@ -155,9 +181,8 @@ class Player:
         if not self.is_playing or (check_stop_callback and check_stop_callback()):
             return
 
-        rect = self.window_manager.get_window_rect()
+        rect = self._get_valid_rect()
         if not rect:
-            print("[Player] Emulator window not found. Skipping drag.")
             return
 
         win_x, win_y, win_w, win_h = rect
@@ -168,10 +193,12 @@ class Player:
         abs_end_x = win_x + block.end_x
         abs_end_y = win_y + block.end_y
 
-        # Move to start and drag to end
-        human_move_to(abs_start_x, abs_start_y)
-        pyautogui.dragTo(abs_end_x, abs_end_y, duration=block.duration, button='left')
-        print(f"[Player] Dragged from absolute ({abs_start_x}, {abs_start_y}) to ({abs_end_x}, {abs_end_y})")
+        try:
+            human_move_to(abs_start_x, abs_start_y)
+            pyautogui.dragTo(abs_end_x, abs_end_y, duration=block.duration, button='left')
+            print(f"[Player] Dragged from absolute ({abs_start_x}, {abs_start_y}) to ({abs_end_x}, {abs_end_y})")
+        except pyautogui.FailSafeException:
+            print(f"[Player] FailSafe triggered during drag. Skipping.")
 
     def _execute_delay(self, block: DelayBlock, check_stop_callback):
         """Executes a delay block."""
@@ -209,9 +236,11 @@ class Player:
             scan_pass += 1
 
             # Fresh screenshot every pass
-            rect = self.window_manager.get_window_rect()
+            rect = self._get_valid_rect()
+            if not rect:
+                break
             matches = self.vision.find_all_templates(
-                assets_dir="assets",
+                assets_dir="assets/popups",
                 region=rect,
                 threshold=block.threshold,
             )
@@ -221,14 +250,18 @@ class Player:
 
             # Click only the FIRST match (topmost popup)
             abs_x, abs_y, asset_name = matches[0]
-            human_move_to(abs_x, abs_y)
-            pyautogui.click(abs_x, abs_y)
-            total_clicks += 1
-            print(
-                f"[Player] Pass {scan_pass}: clicked '{asset_name}' "
-                f"at ({abs_x}, {abs_y})  "
-                f"[{len(matches)} match(es) on screen]"
-            )
+            try:
+                human_move_to(abs_x, abs_y)
+                pyautogui.click(abs_x, abs_y)
+                total_clicks += 1
+                print(
+                    f"[Player] Pass {scan_pass}: clicked '{asset_name}' "
+                    f"at ({abs_x}, {abs_y})  "
+                    f"[{len(matches)} match(es) on screen]"
+                )
+            except pyautogui.FailSafeException:
+                print(f"[Player] FailSafe triggered during vision scan click. Stopping scan.")
+                break
 
             # Wait for the popup to close before re-scanning
             self._safe_sleep(CLICK_SETTLE_TIME, check_stop_callback)
@@ -241,7 +274,7 @@ class Player:
                 f"in {scan_pass} pass(es). Resuming macro."
             )
 
-    def _execute_sub_macro(self, block: SubMacroBlock, check_stop_callback, depth: int):
+    def _execute_sub_macro(self, block: SubMacroBlock, check_stop_callback, on_abort_callback, depth: int):
         """Executes a sub-macro by loading and playing it recursively."""
         if not block.macro_file:
             print("[Player] Sub-macro block has no file specified. Skipping.")
@@ -253,11 +286,11 @@ class Player:
         sub_player = Player(self.window_manager, self.vision)
         if sub_player.load_macro(block.macro_file):
             sub_player.is_playing = self.is_playing
-            sub_player.play(check_stop_callback=check_stop_callback, _depth=depth + 1)
+            sub_player.play(check_stop_callback=check_stop_callback, on_abort_callback=on_abort_callback, _depth=depth + 1)
         else:
             print(f"[Player] Failed to load sub-macro: {block.macro_file}")
 
-    def _execute_periodic(self, block: PeriodicBlock, check_stop_callback, depth: int):
+    def _execute_periodic(self, block: PeriodicBlock, check_stop_callback, on_abort_callback, depth: int):
         """Executes a sub-macro only every N iterations of the main loop."""
         if not block.macro_file:
             return
@@ -273,9 +306,66 @@ class Player:
             
             if sub_player.load_macro(block.macro_file):
                 sub_player.is_playing = self.is_playing
-                sub_player.play(check_stop_callback=check_stop_callback, _depth=depth + 1)
+                sub_player.play(check_stop_callback=check_stop_callback, on_abort_callback=on_abort_callback, _depth=depth + 1)
         else:
             print(f"[Player] 🔄 Periodic skip: iteration {self.iteration_count} is not a multiple of {block.n_iterations}.")
+
+    def _execute_image_check(self, block: ImageCheckBlock, check_stop_callback, on_abort_callback):
+        """
+        Executes an image check. If the image is not found within the threshold,
+        the macro stops immediately.
+        """
+        if not block.image_path:
+            print("[Player] 🛡️ Image check: no image path specified. Skipping check.")
+            return
+
+        print(f"[Player] 🛡️ Checking for image: {os.path.basename(block.image_path)} (threshold={block.threshold:.2f})")
+
+        rect = self._get_valid_rect()
+        match = self.vision.find_template(
+            template_path=block.image_path,
+            region=rect,
+            threshold=block.threshold,
+        )
+
+        if match:
+            print(f"[Player] 🛡️ Image check passed: image found at {match}.")
+        else:
+            print(f"[Player] 🛡️ Image check FAILED: image NOT found.")
+            if block.on_fail == "continue_loop":
+                print("[Player] 🛡️ Action: skipping iteration (continue loop).")
+                raise ContinueLoopException()
+            else:
+                print("[Player] 🛡️ Action: stopping macro.")
+                if on_abort_callback:
+                    on_abort_callback()
+                self.stop()
+
+    def _execute_loop(self, block: LoopBlock, check_stop_callback, on_abort_callback, depth: int):
+        """Executes child blocks N times."""
+        if not block.children:
+            print("[Player] 🔁 Loop has no children. Skipping.")
+            return
+
+        print(f"[Player] 🔁 Starting loop: {block.iterations} iterations, {len(block.children)} children.")
+
+        for iteration in range(1, block.iterations + 1):
+            if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                print(f"[Player] 🔁 Loop interrupted at iteration {iteration}.")
+                break
+
+            print(f"[Player] 🔁 Loop iteration {iteration}/{block.iterations}")
+
+            try:
+                for child_block in block.children:
+                    if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                        break
+                    self._execute_block(child_block, check_stop_callback, on_abort_callback, depth + 1)
+            except ContinueLoopException:
+                print(f"[Player] 🔁 Iteration {iteration} skipped.")
+                continue
+
+        print(f"[Player] 🔁 Loop completed.")
 
     def stop(self):
         """Signals playback to stop."""

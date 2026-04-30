@@ -299,7 +299,8 @@ class MainWindow(QMainWindow):
                 self._player.macro = macro
                 self._player.is_playing = True
                 self._player.play(
-                    check_stop_callback=lambda: self._stop_event.is_set()
+                    check_stop_callback=lambda: self._stop_event.is_set(),
+                    on_abort_callback=lambda: self._stop_event.set()
                 )
 
                 if self._stop_event.is_set():

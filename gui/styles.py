@@ -37,6 +37,10 @@ COLORS = {
     "block_drag_light":  "#FB923C",
     "block_periodic":    "#06B6D4",
     "block_periodic_light":"#22D3EE",
+    "block_image_check": "#EF4444",
+    "block_image_check_light": "#F87171",
+    "block_loop":       "#14B8A6",
+    "block_loop_light": "#2DD4BF",
 
     # Status
     "success":   "#3FB950",
@@ -96,6 +100,18 @@ BLOCK_STYLE_MAP = {
         "bg_light": COLORS["block_periodic_light"],
         "icon": "🔄",
         "label": "Periodic",
+    },
+    "image_check": {
+        "bg": COLORS["block_image_check"],
+        "bg_light": COLORS["block_image_check_light"],
+        "icon": "🛡️",
+        "label": "Image Check",
+    },
+    "loop": {
+        "bg": COLORS["block_loop"],
+        "bg_light": COLORS["block_loop_light"],
+        "icon": "🔁",
+        "label": "Loop",
     },
 }
 

@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QByteArray
 from PyQt6.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QFont
 
-from modules.models import Block, Macro
+from modules.models import Block, Macro, BLOCK_LOOP
 from .block_widget import BlockWidget
+from .loop_widget import LoopWidget
 from .styles import COLORS, drop_indicator_style
 
 
@@ -123,8 +124,12 @@ class TimelineWidget(QScrollArea):
     # ── Internal ────────────────────────────────────────────────────
 
     def _add_block_widget(self, block: Block, index: int = -1):
-        """Creates a BlockWidget and adds it at the specified position."""
-        widget = BlockWidget(block, len(self._block_widgets))
+        """Creates a BlockWidget (or LoopWidget) and adds it at the specified position."""
+        if block.type == BLOCK_LOOP:
+            widget = LoopWidget(block, len(self._block_widgets))
+            widget.child_clicked.connect(self._on_child_block_clicked)
+        else:
+            widget = BlockWidget(block, len(self._block_widgets))
         widget.clicked.connect(self._on_block_clicked)
         widget.delete_requested.connect(self._on_block_delete)
 
@@ -174,6 +179,14 @@ class TimelineWidget(QScrollArea):
     def _on_block_delete(self, widget: BlockWidget):
         """Handles block deletion request."""
         self.remove_block(widget)
+
+    def _on_child_block_clicked(self, child_widget: BlockWidget):
+        """Handles a child block inside a loop being clicked — select it for properties editing."""
+        if self._selected_widget and self._selected_widget is not child_widget:
+            self._selected_widget.set_selected(False)
+        child_widget.set_selected(True)
+        self._selected_widget = child_widget
+        self.block_selected.emit(child_widget)
 
     # ── Drag & Drop ─────────────────────────────────────────────────
 

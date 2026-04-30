@@ -11,8 +11,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 
 from modules.models import (
-    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, PeriodicBlock, DragBlock,
-    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_PERIODIC, BLOCK_DRAG,
+    Block, ClickBlock, DelayBlock, VisionScanBlock, SubMacroBlock, ScrollBlock, PeriodicBlock, DragBlock, ImageCheckBlock, LoopBlock,
+    BLOCK_CLICK, BLOCK_DELAY, BLOCK_VISION_SCAN, BLOCK_SUB_MACRO, BLOCK_SCROLL, BLOCK_PERIODIC, BLOCK_DRAG, BLOCK_IMAGE_CHECK, BLOCK_LOOP,
     list_saved_macros,
 )
 from .styles import COLORS, BLOCK_STYLE_MAP
@@ -191,6 +191,63 @@ class PropertiesPanel(QWidget):
 
         self._params_layout.addWidget(self._drag_widget)
 
+        # -- Image Check parameters --
+        self._image_check_widget = QWidget()
+        image_check_layout = QVBoxLayout(self._image_check_widget)
+        image_check_layout.setContentsMargins(0, 0, 0, 0)
+        image_check_layout.setSpacing(8)
+
+        field_layout = QHBoxLayout()
+        field_label = QLabel("Immagine")
+        field_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        field_label.setFixedWidth(80)
+        field_layout.addWidget(field_label)
+
+        self._image_check_combo = QComboBox()
+        self._image_check_combo.setMinimumHeight(30)
+        self._image_check_combo.currentTextChanged.connect(self._on_param_changed)
+        field_layout.addWidget(self._image_check_combo)
+        image_check_layout.addLayout(field_layout)
+
+        self._image_threshold_spin = self._create_float_field("Soglia (%)", image_check_layout, 0.0, 1.0, 0.05)
+
+        field_layout = QHBoxLayout()
+        field_label = QLabel("Se non trovata")
+        field_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        field_label.setFixedWidth(80)
+        field_layout.addWidget(field_label)
+
+        self._image_fail_combo = QComboBox()
+        self._image_fail_combo.setMinimumHeight(30)
+        self._image_fail_combo.addItem("Ferma Macro", "abort")
+        self._image_fail_combo.addItem("Salta Iterazione", "continue_loop")
+        self._image_fail_combo.currentTextChanged.connect(self._on_param_changed)
+        field_layout.addWidget(self._image_fail_combo)
+        image_check_layout.addLayout(field_layout)
+
+        # Info label
+        image_info = QLabel("ℹ️ Se l'immagine non viene trovata,\nla macro si interrompe.")
+        image_info.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px; padding: 4px;")
+        image_info.setWordWrap(True)
+        image_check_layout.addWidget(image_info)
+
+        self._params_layout.addWidget(self._image_check_widget)
+
+        # -- Loop parameters --
+        self._loop_widget = QWidget()
+        loop_layout = QVBoxLayout(self._loop_widget)
+        loop_layout.setContentsMargins(0, 0, 0, 0)
+        loop_layout.setSpacing(8)
+
+        self._loop_iter_spin = self._create_int_field("Iterazioni", loop_layout, 1, 9999)
+
+        loop_info = QLabel("ℹ️ I blocchi contenuti nel loop\nvengono eseguiti N volte.")
+        loop_info.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px; padding: 4px;")
+        loop_info.setWordWrap(True)
+        loop_layout.addWidget(loop_info)
+
+        self._params_layout.addWidget(self._loop_widget)
+
         main_layout.addWidget(self._params_group)
         main_layout.addStretch()
 
@@ -250,6 +307,17 @@ class PropertiesPanel(QWidget):
             self._drag_end_y.setValue(block.end_y)
             self._drag_duration.setValue(block.duration)
             self._drag_delay.setValue(block.delay)
+        elif block.type == BLOCK_IMAGE_CHECK:
+            self._image_check_widget.show()
+            self._refresh_image_combo(block.image_path)
+            self._image_threshold_spin.setValue(block.threshold)
+            
+            idx = self._image_fail_combo.findData(block.on_fail)
+            if idx >= 0:
+                self._image_fail_combo.setCurrentIndex(idx)
+        elif block.type == BLOCK_LOOP:
+            self._loop_widget.show()
+            self._loop_iter_spin.setValue(block.iterations)
 
         self._updating = False
 
@@ -279,6 +347,8 @@ class PropertiesPanel(QWidget):
         self._scroll_widget.hide()
         self._periodic_widget.hide()
         self._drag_widget.hide()
+        self._image_check_widget.hide()
+        self._loop_widget.hide()
 
     def _create_int_field(self, label_text: str, layout: QVBoxLayout, min_val: int, max_val: int) -> QSpinBox:
         """Creates a labeled integer spin box."""
@@ -354,6 +424,24 @@ class PropertiesPanel(QWidget):
 
         self._periodic_macro_combo.blockSignals(False)
 
+    def _refresh_image_combo(self, current_value: str = ""):
+        """Refreshes the image combo box with discovered assets."""
+        self._image_check_combo.blockSignals(True)
+        self._image_check_combo.clear()
+        self._image_check_combo.addItem("-- Seleziona --", "")
+
+        from modules.vision import Vision
+        for filepath in Vision.discover_assets("assets/checks"):
+            display = os.path.basename(filepath)
+            self._image_check_combo.addItem(display, filepath)
+
+        if current_value:
+            idx = self._image_check_combo.findData(current_value)
+            if idx >= 0:
+                self._image_check_combo.setCurrentIndex(idx)
+
+        self._image_check_combo.blockSignals(False)
+
     def _on_param_changed(self):
         """Writes changed parameter values back to the block model."""
         if self._updating or not self._current_block:
@@ -388,5 +476,13 @@ class PropertiesPanel(QWidget):
             block.end_y = self._drag_end_y.value()
             block.duration = self._drag_duration.value()
             block.delay = self._drag_delay.value()
+        elif block.type == BLOCK_IMAGE_CHECK:
+            idx = self._image_check_combo.currentIndex()
+            block.image_path = self._image_check_combo.itemData(idx) or ""
+            block.threshold = self._image_threshold_spin.value()
+            idx_fail = self._image_fail_combo.currentIndex()
+            block.on_fail = self._image_fail_combo.itemData(idx_fail) or "abort"
+        elif block.type == BLOCK_LOOP:
+            block.iterations = self._loop_iter_spin.value()
 
         self.block_updated.emit()

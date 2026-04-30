@@ -3,6 +3,7 @@ Window Manager module.
 Handles finding the emulator window and getting its dimensions.
 """
 import win32gui
+import win32con
 from typing import Tuple, Optional
 
 class WindowManager:
@@ -64,6 +65,10 @@ class WindowManager:
             if not self.find_window():
                 return False
         try:
+            # If the window is minimized, restore it
+            if win32gui.IsIconic(self.hwnd):
+                win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
+            
             win32gui.SetForegroundWindow(self.hwnd)
             return True
         except Exception:
