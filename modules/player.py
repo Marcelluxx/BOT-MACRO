@@ -218,14 +218,15 @@ class Player:
 
         Strategy:
         1. Take a fresh screenshot
-        2. Find all matching assets
-        3. Click only the FIRST match (the topmost/foreground popup)
-        4. Wait for the popup to close
+        2. Find ALL matching popup assets on screen
+        3. Click every match found in this pass, one by one
+        4. Wait briefly after each click for the popup to close
         5. Take a NEW screenshot and repeat from step 2
         6. Stop when no more matches are found
 
-        This ensures popups hidden behind other popups are handled correctly —
-        we never try to click a button that's obscured by a foreground popup.
+        This ensures ALL visible popups are dismissed before resuming the macro.
+        After clicking everything visible, a re-scan catches any new popups
+        that may have appeared underneath the ones we just closed.
         """
         MAX_PASSES = 20  # Safety limit to prevent infinite loops
         CLICK_SETTLE_TIME = 0.8  # Time to wait for a popup to close after clicking
@@ -255,23 +256,31 @@ class Player:
             if not matches:
                 break  # Screen is clean — no more popups
 
-            # Click only the FIRST match (topmost popup)
-            abs_x, abs_y, asset_name = matches[0]
-            try:
-                human_move_to(abs_x, abs_y)
-                pyautogui.click(abs_x, abs_y)
-                total_clicks += 1
-                print(
-                    f"[Player] Pass {scan_pass}: clicked '{asset_name}' "
-                    f"at ({abs_x}, {abs_y})  "
-                    f"[{len(matches)} match(es) on screen]"
-                )
-            except pyautogui.FailSafeException:
-                print(f"[Player] FailSafe triggered during vision scan click. Stopping scan.")
-                break
+            # Click ALL matches found in this pass, one by one
+            clicks_this_pass = 0
+            for abs_x, abs_y, asset_name in matches:
+                if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                    print("[Player] Vision scan interrupted during clicking.")
+                    return
 
-            # Wait for the popup to close before re-scanning
-            self._safe_sleep(CLICK_SETTLE_TIME, check_stop_callback)
+                try:
+                    human_move_to(abs_x, abs_y)
+                    pyautogui.click(abs_x, abs_y)
+                    total_clicks += 1
+                    clicks_this_pass += 1
+                    print(
+                        f"[Player] Pass {scan_pass}: clicked '{asset_name}' "
+                        f"at ({abs_x}, {abs_y})  "
+                        f"[{clicks_this_pass}/{len(matches)} in this pass]"
+                    )
+                except pyautogui.FailSafeException:
+                    print(f"[Player] FailSafe triggered during vision scan click. Stopping scan.")
+                    break
+
+                # Wait for the popup to close before clicking the next one
+                self._safe_sleep(CLICK_SETTLE_TIME, check_stop_callback)
+
+            # After clicking all matches, re-scan to check for new popups
 
         if total_clicks == 0:
             print("[Player] Vision scan: no popups found on screen.")
