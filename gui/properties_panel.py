@@ -225,6 +225,20 @@ class PropertiesPanel(QWidget):
         field_layout.addWidget(self._image_fail_combo)
         image_check_layout.addLayout(field_layout)
 
+        field_layout = QHBoxLayout()
+        field_label = QLabel("Clicca se trovata")
+        field_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        field_label.setFixedWidth(80)
+        field_layout.addWidget(field_label)
+
+        self._image_click_combo = QComboBox()
+        self._image_click_combo.setMinimumHeight(30)
+        self._image_click_combo.addItem("No", False)
+        self._image_click_combo.addItem("Sì", True)
+        self._image_click_combo.currentTextChanged.connect(self._on_param_changed)
+        field_layout.addWidget(self._image_click_combo)
+        image_check_layout.addLayout(field_layout)
+
         # Info label
         image_info = QLabel("ℹ️ Se l'immagine non viene trovata,\nla macro si interrompe.")
         image_info.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px; padding: 4px;")
@@ -315,6 +329,10 @@ class PropertiesPanel(QWidget):
             idx = self._image_fail_combo.findData(block.on_fail)
             if idx >= 0:
                 self._image_fail_combo.setCurrentIndex(idx)
+                
+            idx_click = self._image_click_combo.findData(block.click_if_found)
+            if idx_click >= 0:
+                self._image_click_combo.setCurrentIndex(idx_click)
         elif block.type == BLOCK_LOOP:
             self._loop_widget.show()
             self._loop_iter_spin.setValue(block.iterations)
@@ -482,6 +500,8 @@ class PropertiesPanel(QWidget):
             block.threshold = self._image_threshold_spin.value()
             idx_fail = self._image_fail_combo.currentIndex()
             block.on_fail = self._image_fail_combo.itemData(idx_fail) or "abort"
+            idx_click = self._image_click_combo.currentIndex()
+            block.click_if_found = bool(self._image_click_combo.itemData(idx_click))
         elif block.type == BLOCK_LOOP:
             block.iterations = self._loop_iter_spin.value()
 

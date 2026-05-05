@@ -17,7 +17,7 @@ from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QAction
 from modules.models import Macro, Block, list_saved_macros
 from modules.window_manager import WindowManager
 from modules.recorder import Recorder
-from modules.player import Player
+from modules.player import Player, ContinueLoopException
 from modules.vision import Vision
 
 from .toolbox_widget import ToolboxWidget
@@ -298,10 +298,15 @@ class MainWindow(QMainWindow):
 
                 self._player.macro = macro
                 self._player.is_playing = True
-                self._player.play(
-                    check_stop_callback=lambda: self._stop_event.is_set(),
-                    on_abort_callback=lambda: self._stop_event.set()
-                )
+                try:
+                    self._player.play(
+                        check_stop_callback=lambda: self._stop_event.is_set(),
+                        on_abort_callback=lambda: self._stop_event.set()
+                    )
+                except ContinueLoopException:
+                    # This is handled inside Player.play usually, but here as a safety measure
+                    print("[GUI] Playback loop iteration skipped via exception.")
+                    pass
 
                 if self._stop_event.is_set():
                     break

@@ -83,12 +83,19 @@ class Player:
         else:
             print(f"[Player] {'  ' * _depth}Executing sub-macro '{self.macro.name}'...")
 
-        for i, block in enumerate(self.macro.blocks):
-            if not self.is_playing or (check_stop_callback and check_stop_callback()):
-                print(f"[Player] Playback interrupted at block {i + 1}.")
-                break
+        try:
+            for i, block in enumerate(self.macro.blocks):
+                if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                    print(f"[Player] Playback interrupted at block {i + 1}.")
+                    break
 
-            self._execute_block(block, check_stop_callback, on_abort_callback, _depth)
+                self._execute_block(block, check_stop_callback, on_abort_callback, _depth)
+        except ContinueLoopException:
+            if _depth == 0:
+                print(f"[Player] Macro run skipped (top-level skip).")
+            else:
+                # Re-raise so the parent loop can catch it
+                raise
 
         if _depth == 0:
             self.is_playing = False
@@ -330,6 +337,16 @@ class Player:
 
         if match:
             print(f"[Player] 🛡️ Image check passed: image found at {match}.")
+            if block.click_if_found:
+                abs_x, abs_y = match
+                try:
+                    human_move_to(abs_x, abs_y)
+                    pyautogui.click(abs_x, abs_y)
+                    print(f"[Player] 🛡️ Action: clicked on found image at ({abs_x}, {abs_y})")
+                    # Settle time after click
+                    time.sleep(0.5)
+                except pyautogui.FailSafeException:
+                    print(f"[Player] 🛡️ FailSafe triggered during image check click.")
         else:
             print(f"[Player] 🛡️ Image check FAILED: image NOT found.")
             if block.on_fail == "continue_loop":

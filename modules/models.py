@@ -109,6 +109,7 @@ class Block:
                 image_path=data.get("image_path", ""),
                 threshold=data.get("threshold", 0.8),
                 on_fail=data.get("on_fail", "abort"),
+                click_if_found=data.get("click_if_found", False),
             )
         elif block_type == BLOCK_LOOP:
             children = [Block.from_dict(c) for c in data.get("children", [])]
@@ -183,6 +184,7 @@ class ImageCheckBlock(Block):
     image_path: str = ""
     threshold: float = 0.8
     on_fail: str = "abort"  # "abort" or "continue_loop"
+    click_if_found: bool = False
 
 @dataclass
 class LoopBlock(Block):
