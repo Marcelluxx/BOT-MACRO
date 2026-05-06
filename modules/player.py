@@ -15,6 +15,7 @@ from .models import (
 )
 from .utils import random_offset, human_move_to
 from .vision import Vision
+from .notifier import notifier
 
 
 class ContinueLoopException(Exception):
@@ -326,10 +327,70 @@ class Player:
         else:
             print(f"[Player] 🔄 Periodic skip: iteration {self.iteration_count} is not a multiple of {block.n_iterations}.")
 
+    # ── Recovery Constants ──
+    RECOVERY_MAX_ATTEMPTS = 2
+    RECOVERY_WAIT_SECONDS = 7
+
+    def _attempt_recovery(self, block: ImageCheckBlock, check_stop_callback):
+        """
+        Attempts to recover from a failed image check by pressing ESC (LDPlayer Back)
+        and waiting for the game to reload.
+
+        Returns True if recovery succeeded (image found after retry), False otherwise.
+        """
+        for attempt in range(1, self.RECOVERY_MAX_ATTEMPTS + 1):
+            if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                return False
+
+            print(f"[Player] 🔧 Recovery attempt {attempt}/{self.RECOVERY_MAX_ATTEMPTS}: pressing ESC (Back)...")
+            notifier.send_message(
+                f"🔧 <b>Recovery Attempt {attempt}/{self.RECOVERY_MAX_ATTEMPTS}</b>\n"
+                f"Image check failed. Pressing Back and waiting {self.RECOVERY_WAIT_SECONDS}s..."
+            )
+
+            # Bring LDPlayer to front and send Back key
+            self.window_manager.bring_to_front()
+            time.sleep(0.3)
+            try:
+                pyautogui.press('escape')
+            except pyautogui.FailSafeException:
+                print("[Player] 🔧 FailSafe triggered during recovery ESC press.")
+                return False
+
+            # Wait for the game to reload
+            print(f"[Player] 🔧 Waiting {self.RECOVERY_WAIT_SECONDS}s for game to reload...")
+            self._safe_sleep(self.RECOVERY_WAIT_SECONDS, check_stop_callback)
+
+            if not self.is_playing or (check_stop_callback and check_stop_callback()):
+                return False
+
+            # Re-check the image
+            rect = self._get_valid_rect()
+            if not rect:
+                print("[Player] 🔧 Recovery: window not visible. Retrying...")
+                continue
+
+            match = self.vision.find_template(
+                template_path=block.image_path,
+                region=rect,
+                threshold=block.threshold,
+            )
+
+            if match:
+                print(f"[Player] 🔧 Recovery SUCCESS! Image found at {match}.")
+                notifier.send_message("✅ <b>Recovery Succeeded</b>\nGame is back. Resuming macro.")
+                return True
+            else:
+                print(f"[Player] 🔧 Recovery attempt {attempt} failed: image still not found.")
+
+        return False
+
     def _execute_image_check(self, block: ImageCheckBlock, check_stop_callback, on_abort_callback):
         """
         Executes an image check. If the image is not found within the threshold,
-        the macro stops immediately.
+        behavior depends on on_fail:
+        - 'continue_loop': skip current loop iteration
+        - 'abort': attempt auto-recovery first, then abort if recovery fails
         """
         if not block.image_path:
             print("[Player] 🛡️ Image check: no image path specified. Skipping check.")
@@ -362,10 +423,22 @@ class Player:
                 print("[Player] 🛡️ Action: skipping iteration (continue loop).")
                 raise ContinueLoopException()
             else:
-                print("[Player] 🛡️ Action: stopping macro.")
-                if on_abort_callback:
-                    on_abort_callback()
-                self.stop()
+                # Attempt auto-recovery before aborting
+                print("[Player] 🛡️ Attempting auto-recovery...")
+                if self._attempt_recovery(block, check_stop_callback):
+                    # Recovery succeeded — let the macro continue naturally
+                    print("[Player] 🛡️ Recovery complete. Continuing macro.")
+                    return
+                else:
+                    print("[Player] 🛡️ Recovery FAILED. Stopping macro.")
+                    notifier.send_message(
+                        "🛑 <b>Macro Aborted</b>\n"
+                        f"Image check failed for <code>{os.path.basename(block.image_path)}</code>.\n"
+                        f"Auto-recovery failed after {self.RECOVERY_MAX_ATTEMPTS} attempts."
+                    )
+                    if on_abort_callback:
+                        on_abort_callback()
+                    self.stop()
 
     def _execute_loop(self, block: LoopBlock, check_stop_callback, on_abort_callback, depth: int):
         """Executes child blocks N times."""

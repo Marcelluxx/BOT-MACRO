@@ -6,3 +6,5 @@ mss
 numpy
 keyboard
 PyQt6
+requests
+python-dotenv

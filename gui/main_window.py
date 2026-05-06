@@ -19,6 +19,7 @@ from modules.window_manager import WindowManager
 from modules.recorder import Recorder
 from modules.player import Player, ContinueLoopException
 from modules.vision import Vision
+from modules.notifier import notifier
 
 from .toolbox_widget import ToolboxWidget
 from .timeline_widget import TimelineWidget
@@ -118,7 +119,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._play_btn)
 
         # ── Stop Button ──
-        self._stop_btn = QPushButton("⏹  Stop (ESC)")
+        self._stop_btn = QPushButton("⏹  Stop (F12)")
         self._stop_btn.setStyleSheet(toolbar_button_style(COLORS["warning"]))
         self._stop_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._stop_btn.setEnabled(False)
@@ -203,14 +204,14 @@ class MainWindow(QMainWindow):
 
     def _setup_hotkeys(self):
         """Sets up keyboard shortcuts within the application."""
-        # Note: Global hotkeys (F8, F9, ESC) are handled via keyboard library
+        # Note: Global hotkeys (F7, F8, F9, F12) are handled via keyboard library
         # to work even when the app is not focused
         try:
             import keyboard
             keyboard.add_hotkey('F8', self._safe_toggle_record)
             keyboard.add_hotkey('F9', self._safe_toggle_play)
             keyboard.add_hotkey('F7', self._safe_insert_flag)
-            keyboard.add_hotkey('esc', self._safe_emergency_stop)
+            keyboard.add_hotkey('F12', self._safe_emergency_stop)
         except Exception as e:
             print(f"[GUI] Warning: Could not set up global hotkeys: {e}")
             self._status_bar.showMessage("⚠️ Hotkey globali non disponibili. Usa i pulsanti della toolbar.")
@@ -282,57 +283,75 @@ class MainWindow(QMainWindow):
         self._app_state = "PLAYING"
         self._stop_event.clear()
         self._update_state_display()
-        self._status_bar.showMessage("▶ Riproduzione in corso... (F9 o ESC per fermare)")
+        self._status_bar.showMessage("▶ Riproduzione in corso... (F9 o F12 per fermare)")
 
         # Build a temporary macro for the player
         macro = Macro(name="Live Playback", blocks=blocks)
 
         def play_loop():
-            while not self._stop_event.is_set():
-                # Bring window to front
-                self._window_manager.bring_to_front()
-                time.sleep(0.5)
+            try:
+                while not self._stop_event.is_set():
+                    # Bring window to front
+                    self._window_manager.bring_to_front()
+                    time.sleep(0.5)
 
-                if self._stop_event.is_set():
-                    break
+                    if self._stop_event.is_set():
+                        break
 
-                self._player.macro = macro
-                self._player.is_playing = True
-                try:
-                    self._player.play(
-                        check_stop_callback=lambda: self._stop_event.is_set(),
-                        on_abort_callback=lambda: self._stop_event.set()
-                    )
-                except ContinueLoopException:
-                    # This is handled inside Player.play usually, but here as a safety measure
-                    print("[GUI] Playback loop iteration skipped via exception.")
-                    pass
+                    self._player.macro = macro
+                    self._player.is_playing = True
+                    try:
+                        self._player.play(
+                            check_stop_callback=lambda: self._stop_event.is_set(),
+                            on_abort_callback=lambda: self._stop_event.set()
+                        )
+                    except ContinueLoopException:
+                        # This is handled inside Player.play usually, but here as a safety measure
+                        print("[GUI] Playback loop iteration skipped via exception.")
+                        pass
 
-                if self._stop_event.is_set():
-                    break
+                    if self._stop_event.is_set():
+                        break
 
-                # Small pause between loop iterations
-                time.sleep(0.5)
-
-            self._bridge.playback_finished.emit()
+                    # Small pause between loop iterations
+                    time.sleep(0.5)
+            except Exception as e:
+                import html
+                error_text = html.escape(str(e))
+                print(f"[GUI] Exception in playback loop: {e}")
+                notifier.send_message(f"⚠️ <b>Exception in GUI Playback</b>\n<pre>{error_text}</pre>")
+                self._stop_event.set()
+            finally:
+                self._bridge.playback_finished.emit()
 
         self._play_thread = threading.Thread(target=play_loop, daemon=True)
         self._play_thread.start()
 
     def _stop_playback(self):
         """Signals playback to stop."""
+        if self._stop_event.is_set() or self._app_state != "PLAYING":
+            return
         self._stop_event.set()
         self._player.stop()
         self._status_bar.showMessage("⏹ Fermando la riproduzione...")
+        notifier.send_message("⏹ <b>Playback Stopped</b>\nThe bot playback was stopped manually.")
 
     def _on_playback_finished(self):
         """Called on the main thread when playback finishes."""
         self._app_state = "IDLE"
         self._update_state_display()
         self._status_bar.showMessage("⏹ Riproduzione terminata.")
+        if not self._stop_event.is_set():
+            notifier.send_message("✅ <b>Playback Finished</b>\nThe macro has completed its execution.")
 
     def _emergency_stop(self):
         """Emergency stop for all operations."""
+        # Prevent multiple triggers from spamming notifications if hotkey is held
+        if self._stop_event.is_set() and self._app_state == "IDLE":
+            return
+            
+        was_already_stopping = self._stop_event.is_set() or self._app_state == "IDLE"
+        
         self._stop_event.set()
         self._player.stop()
 
@@ -344,6 +363,9 @@ class MainWindow(QMainWindow):
         self._app_state = "IDLE"
         self._update_state_display()
         self._status_bar.showMessage("🛑 Arresto di emergenza eseguito.")
+        
+        if not was_already_stopping:
+            notifier.send_message("🛑 <b>Emergency Stop</b>\nThe bot was stopped via emergency stop (ESC).")
 
     def _insert_flag(self):
         """Inserts a vision_scan flag during recording."""
