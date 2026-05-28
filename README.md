@@ -1,122 +1,166 @@
-# BOT-MACRO — Visual Automation Bot 🤖
+# 🤖 BOT-MACRO
 
-**BOT-MACRO** is a professional desktop automation software designed for Android emulators (like LDPlayer and BlueStacks) and standard Windows applications. Moving beyond simple macro recorders, it features a **Drag & Drop Visual Editor** and an intelligent **Computer Vision** system to dynamically handle popups and unexpected UI states.
+### *Next-Generation Desktop & Game Automation Suite*
+
+Designed for Android emulators (LDPlayer, BlueStacks) and standard Windows applications. Built with a sleek **PyQt6 Visual Editor** and powered by an intelligent **OpenCV Computer Vision Engine**.
+
+<p align="left">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+" /></a>
+  <a href="https://www.qt.io/"><img src="https://img.shields.io/badge/UI-PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PyQt6" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/OS-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="OS Windows" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status Active" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License MIT" /></a>
+</p>
+
+---
+
+## 📖 Introduction
+
+**BOT-MACRO** is a professional desktop automation suite designed for Android emulators (like LDPlayer and BlueStacks) and standard Windows applications. 
+
+Unlike generic, rigid macro recorders, BOT-MACRO features a high-fidelity **Drag & Drop Visual Editor** for building modular workflows, coupled with an intelligent **OpenCV Computer Vision Engine** that dynamically scans, detects, and interacts with UI elements. It is engineered with robust stealth mechanics to prevent bans and gracefully handle unexpected states or layered popups.
 
 ---
 
 ## 🌟 Core Features
 
-*   **🎨 Visual Editor:** Construct macros intuitively by dragging and dropping action blocks (Click, Delay, Vision Scan, Sub-Macro) without writing any code.
-*   **🖱️ Smart Recording:** Record your mouse clicks in real-time. Use the **F7** hotkey during recording to insert intelligent "Vision Checkpoints".
-*   **👁️ Multi-Asset Vision Scanning:** The bot actively "sees" the screen. It automatically recognizes buttons or images placed in the `assets/` folder (like "X" buttons to close ads or "OK" buttons) and clicks them.
-*   **♻️ Layered Popup Handling:** If multiple popups overlap, the bot closes them one by one, refreshing its visual scan after each click to ensure robust execution.
-*   **🛡️ Anti-Ban Mechanics:**
-    *   **Human-like Movements:** Mouse cursors move using natural, bezier-like acceleration curves instead of instant teleportation.
-    *   **Randomization:** Every click includes a random spatial offset (+/- 3px) and randomized execution delays to mimic human behavior and evade detection.
-*   **🧩 Modularity (Sub-Macros):** Create smaller, reusable macros and nest them inside larger ones.
-*   **📱 Telegram Notifications:** Built-in support to alert you via Telegram if the bot encounters an error or is stopped.
+| Feature | Description | Emojis & Tech |
+| :--- | :--- | :--- |
+| **Visual Workflow Builder** | Construct robust macro scripts intuitively by dragging and dropping action blocks (Click, Delay, Vision Scan, Sub-Macros) onto an interactive timeline. | 🎨 `PyQt6` |
+| **Computer Vision Engine** | Dynamically scans specific window regions for image assets. Recognizes buttons (like close "X" or "Confirm") and triggers automated interactions. | 👁️ `OpenCV` |
+| **Anti-Ban Architecture** | Evades bot-detection algorithms through curved mouse trajectories (Bezier curves), random coordinate offsets (+/- 3px), and randomized wait intervals. | 🛡️ `Stealth` |
+| **Layered Popup Resolver** | Automatically handles overlapping windows or recursive prompts by executing a persistent re-scan loop, clearing popups one by one. | 🔄 `Resilient` |
+| **Modular Sub-Macros** | Break complex pipelines down into highly reusable sub-macros, nesting actions inside main scripts for clean project architecture. | 🧩 `Modular` |
+| **Instant Telegram Alerts** | Built-in Telegram integration through BotFather to receive live telemetry, error logs, and failsafe notifications on your mobile device. | 📱 `Telegram API` |
 
 ---
 
-## 🚀 Complete Setup Guide (From A to Z)
+## ⚙️ System Architecture
 
-Follow these step-by-step instructions to get the bot running on your local machine.
+```mermaid
+graph TD
+    A[PyQt6 Visual Editor] -->|Saves JSON Config| B[Macro Timeline]
+    C[Real-time Recording Engine] -->|Captures Actions & Flags| B
+    B -->|Playback Execution| D[Player Module]
+    D -->|Coordinate Actions| E[Bezier Mouse Controller]
+    D -->|State Assertion| F[Computer Vision Scanner]
+    F -->|Local Assets| G[(assets/ folder)]
+    E -->|Interact| H[Target Application / Emulator]
+    F -->|Capture & Match| H
+    D -->|Error/Status Stream| I[Telegram Notifier]
+    I -->|Notification| J[Mobile Device]
+```
 
-### 1. Prerequisites
-Ensure you have the following installed:
-- [Python 3.10+](https://www.python.org/downloads/) (Make sure to check "Add Python to PATH" during installation).
-- [Git](https://git-scm.com/downloads) (To clone the repository).
+---
 
-### 2. Installation
-Open your terminal (Command Prompt or PowerShell) and run the following commands:
+## 🚀 Getting Started
+
+Follow this guide to set up BOT-MACRO on your local machine.
+
+### Prerequisites
+- **Operating System:** Windows (Required for `pywin32` API integration)
+- **Python:** Version [3.10+](https://www.python.org/downloads/) (Ensure you select **"Add Python to PATH"** during installation)
+- **Git:** Version [2.x+](https://git-scm.com/downloads)
+
+### Installation
+Open your terminal (PowerShell or Command Prompt) and execute the following commands:
 
 ```bash
 # Clone the repository
 git clone https://github.com/marcelluxx/BOT-MACRO.git
 
-# Navigate into the project directory
+# Navigate into the project root
 cd BOT-MACRO
 
-# Create a virtual environment to keep dependencies isolated
+# Create a virtual environment
 python -m venv .venv
 
 # Activate the virtual environment
-# On Windows:
 .venv\Scripts\activate
-# (On Mac/Linux, use: source .venv/bin/activate)
 
-# Install required Python packages
+# Install the required dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Setup Telegram Notifications (Optional but recommended)
-If you want the bot to send you updates:
-1. Talk to [BotFather](https://t.me/botfather) on Telegram to create a bot and get a **Token**.
-2. Find your **Chat ID** (using a bot like @userinfobot).
-3. Create a `.env` file in the root directory of the project.
-4. Add the following lines to your `.env` file:
+---
+
+## 📱 Telegram Integration (Optional)
+
+Configure instant mobile notifications for when your bot encounters a critical error, successfully finishes execution, or is forcefully aborted.
+
+1. Create a bot by talking to [BotFather](https://t.me/botfather) on Telegram and secure your unique **API Token**.
+2. Retrieve your chat ID by querying [@userinfobot](https://t.me/userinfobot).
+3. Create a `.env` file in the root directory:
    ```env
    TELEGRAM_BOT_TOKEN=your_bot_token_here
    TELEGRAM_CHAT_ID=your_chat_id_here
    ```
 
-### 4. Running the Bot
-Launch the graphical interface (GUI) with:
-```bash
-python main.py
-```
-
 ---
 
-## 🎮 How to Use the Bot
+## 🎮 How to Use
 
-### 1. Preparing Vision Assets
-Place `.png` images of buttons or icons you want the bot to recognize into the `assets/` folder. The bot will automatically scan this folder during a "Vision Scan" action and click any matches it finds on screen.
+### 1. Launching the Application
+Execute the entry point module to start the visual suite:
+```bash
+# Start with PyQt6 GUI Editor (Recommended)
+python main.py
 
-### 2. Creating a Macro
-You can build a macro in two ways:
+# Start in Legacy CLI Mode
+python main.py --cli
+```
 
-*   **Manual Method:** Drag blocks from the left **Toolbox** into the center **Timeline**.
-*   **Recording Method:**
-    1.  Click **⏺ Record** (or press **F8**).
-    2.  Perform your clicks inside the emulator/app.
-    3.  **IMPORTANT:** If a popup appears, or you want the bot to verify the screen state, press **F7**. This inserts a "Vision Flag".
-    4.  Press **F8** again to stop recording.
+### 2. Setting Up Vision Templates
+Place clean, cropped `.png` image files of buttons or icons you want the bot to detect (such as `ok_button.png` or `close.png`) into the `assets/` directory. The OpenCV Engine scans this directory to automatically target these icons during **Vision Scan** actions.
 
-### 3. Editing your Macro
-*   **Reorder:** Drag blocks up and down in the timeline.
-*   **Edit:** Click any block to reveal its properties on the right panel (adjust coordinates, delays, or vision matching thresholds).
-*   **Sub-Macros:** Drag a saved `.json` macro from the "Saved Actions" section into the timeline to nest it.
-
-### 4. Playback
-Press **▶ Play** (or **F9**). The bot will automatically bring the target window (default: "LDPlayer") to the front and begin looping the macro indefinitely.
+### 3. Constructing Macro Sequences
+* **Visual Editor Method:** Drag actions from the **Toolbox** (left) into the **Timeline** (center). Customize coordinates, delays, and threshold percentages in the **Properties Panel** (right).
+* **Macro Recording Method:**
+  1. Click **⏺ Record** (or press `F8`).
+  2. Perform mouse actions inside your target application window.
+  3. Press `F7` during recording to dynamically insert a **Vision Checkpoint** flag (ideal for dynamic loads/popups).
+  4. Press `F8` again to finalize recording and save the macro.
 
 ---
 
 ## ⌨️ Global Hotkeys
 
-These shortcuts work globally, even if the bot is running in the background:
+These controls work system-wide, even when BOT-MACRO is running in the background:
 
-| Key | Function |
-| :--- | :--- |
-| **F7** | **Insert Vision Flag** (Only during recording) |
-| **F8** | **Toggle Record** |
-| **F9** | **Toggle Playback (Loop)** |
-| **ESC / F12** | **EMERGENCY STOP** (Instantly halts all operations) |
+| Hotkey | Action | Context |
+| :--- | :--- | :--- |
+| <kbd>F7</kbd> | **Insert Vision Flag** | Active only during recording |
+| <kbd>F8</kbd> | **Toggle Recording** | Toggles between Recording and Idle |
+| <kbd>F9</kbd> | **Toggle Playback Loop** | Toggles between Playback and Idle |
+| <kbd>F12</kbd> / <kbd>ESC</kbd> | **EMERGENCY STOP** | Immediately terminates all operations |
 
 ---
 
-## ⚙️ Advanced Configuration
+## 🔧 Advanced Configuration & Failsafes
 
-If your target emulator or application has a window title other than "LDPlayer":
-1. Open `gui/main_window.py` (and `main.py` if using CLI).
+### Targeting Specific Application Windows
+By default, the script targets **"LDPlayer"**. To automate a standard application or a different emulator:
+1. Open `gui/main_window.py` (GUI) or `main.py` (CLI).
 2. Locate the constant `WINDOW_TITLE = "LDPlayer"`.
-3. Change it to exactly match the title of your target window (e.g., "BlueStacks App Player").
+3. Replace `"LDPlayer"` with the exact window name of your target application (e.g., `"BlueStacks App Player"` or `"NoxPlayer"`).
+
+### Physical Failsafe Trigger
+If the bot runs out of control and you are unable to press <kbd>F12</kbd> or <kbd>ESC</kbd>, **violently move your physical mouse to any of the four outer corners of your screen**. This triggers the built-in PyAutoGUI failsafe mechanism and instantly terminates the automation thread.
 
 ---
 
-## 🛠️ Troubleshooting
+## 🤝 Contributing
 
-*   **The bot clicks the wrong spot:** Ensure your emulator window isn't strangely resized. The bot uses relative coordinates, meaning the internal resolution of the emulator must remain consistent between recording and playback.
-*   **Vision Scan doesn't find the buttons:** Check that your `.png` files in `assets/` are cleanly cropped. You can also lower the "Threshold" in the block's properties panel (e.g., set it to `0.7` instead of `0.8`).
-*   **Emergency Failsafe:** If the bot goes out of control, violently move your physical mouse to any of the **four corners of your screen**. This triggers the `PyAutoGUI` fail-safe and aborts the script.
+Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
